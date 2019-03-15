@@ -1,0 +1,12 @@
+**/.terraform
+**/.terragrunt
+**/terraform.tfstate
+**/terraform.*.backup
+**/provider.tfvars
+**/backend.tfvars
+**/*.plan
+**/*.old
+live/subsc_*/terraform.tfvars
+live/global.tfvars
+live/local.tfvars
+local/*
