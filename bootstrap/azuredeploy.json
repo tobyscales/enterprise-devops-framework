@@ -71,7 +71,7 @@
                 "enabled",
                 "disabled"
             ],
-            "defaultValue": "disabled"
+            "defaultValue": "enabled"
         },
         "_artifactsLocation": {
             "type": "object",
