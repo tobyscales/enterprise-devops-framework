@@ -26,7 +26,7 @@ if "%_psrun%"=="1" (
     pwsh -NoProfile -InputFormat None -ExecutionPolicy Bypass -file "%config_dir%tools\get-config.ps1" 
 )
 
-rem .terraform exclusion code cribbed from https://stackoverflow.com/posts/25539569/revisions
+rem .terraform directory exclusion code cribbed from https://stackoverflow.com/posts/25539569/revisions
 for /R "%in_dir%" %%G in (.) DO (
     echo %%G | find /i ".terraform" >nul && ( 
         echo %%G >nul

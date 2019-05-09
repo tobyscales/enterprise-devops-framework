@@ -273,7 +273,7 @@ v2/
 code-samples/
 
 # live folder
-live/
+live/*
 
 #secrets.tfvars
 *secrets.tfvars

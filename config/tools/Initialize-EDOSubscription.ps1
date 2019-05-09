@@ -54,9 +54,11 @@ try {
 }
 
 $username = ((Get-Content -path "$configPath\globals.tfvars").ToLower() | Where-Object { ( (($_.StartsWith('user'))) ) }).split('=')[1].trim('"', ' ')
-$password = Read-Host -Prompt "Please enter a password for the certificate." -AsSecureString
+$password = Read-Host -Prompt "Please enter a password for the certificate" -AsSecureString
 
 $subscriptions = Get-AzSubscription 
+
+#TODO: get username if not found in globals.tfvars
 
 #TODO: add subscription creation option
 do {
