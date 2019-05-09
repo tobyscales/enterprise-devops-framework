@@ -93,7 +93,7 @@ do {
 } until ($selected_kv)
 
 #TODO: add storage account creation option
-$storageaccts = Get-AzStorageAccount | sort -Property StorageAccountName
+$storageaccts = Get-AzStorageAccount | Sort-Object -Property StorageAccountName
 do {
     
     $i = 1
