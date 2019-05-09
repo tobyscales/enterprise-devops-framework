@@ -107,6 +107,5 @@ This approach delivers solid MFA for developer machines without being a nuisance
 ## TODO:
  * Add support for ARM templates
  * Move Get-Backend logic into an Azure Function so the whole shebang can be run with shell/batch scripts and not require PSCore installed locally.
- * Update with Bootstrap deployer
  * Set- or Grant- script with optional parameters for: ring0 KV, Deployer ManagementGroup, TFstate-per-sub, etc.
  * Initialize- script with subscription creation & MG assignment

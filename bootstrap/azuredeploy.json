@@ -5,56 +5,16 @@
         "keyVaultName": {
             "type": "string",
             "metadata": {
-                "description": "Specifies the name of the Ring 0 key vault."
+                "description": "Specifies the name of the Ring 0 Key Vault."
             },
             "defaultValue": "edof-ring0-kv"
         },
-        "location": {
+        "storageAcctName": {
             "type": "string",
-            "defaultValue": "[resourceGroup().location]",
             "metadata": {
-                "description": "Specifies the location for all resources."
-            }
-        },
-        "enableVaultForDeployment": {
-            "type": "bool",
-            "defaultValue": false,
-            "allowedValues": [
-                true,
-                false
-            ],
-            "metadata": {
-                "description": "Specifies whether Azure Virtual Machines are permitted to retrieve certificates stored as secrets from the key vault."
-            }
-        },
-        "enableVaultForTemplateDeployment": {
-            "type": "bool",
-            "defaultValue": false,
-            "allowedValues": [
-                true,
-                false
-            ],
-            "metadata": {
-                "description": "Specifies whether Azure Resource Manager is permitted to retrieve secrets from the key vault."
-            }
-        },
-        "tenantId": {
-            "type": "string",
-            "defaultValue": "[subscription().tenantId]",
-            "metadata": {
-                "description": "Specifies the Azure Active Directory tenant ID that should be used for authenticating requests to the key vault. Get it by using Get-AzSubscription cmdlet."
-            }
-        },
-        "vaultSku": {
-            "type": "string",
-            "defaultValue": "Standard",
-            "allowedValues": [
-                "Standard",
-                "Premium"
-            ],
-            "metadata": {
-                "description": "Specifies the SKU for the key vault"
-            }
+                "description": "Specifies the name of the Ring 0 Storage Account."
+            },
+            "defaultValue": "edof-ring0-sa"
         },
         "logsRetentionInDays": {
             "type": "int",
@@ -64,14 +24,6 @@
             "metadata": {
                 "description": "Specifies the number of days that logs will be kept. If you do not want to apply any retention policy and retain data forever, set value to 0."
             }
-        },
-        "protectWithLocks": {
-            "type": "string",
-            "allowedValues": [
-                "enabled",
-                "disabled"
-            ],
-            "defaultValue": "enabled"
         },
         "_artifactsLocation": {
             "type": "object",
@@ -85,29 +37,42 @@
         }
     },
     "variables": {
+        "protectWithLocks": "enabled",
         "template": {
-            "protectWithLocks": "[concat('nestedtemplates/protectwithlocks', parameters('protectWithLocks'), '.json')]"
+            "protectWithLocks": "[concat('nestedtemplates/protectwithlocks', variables('protectWithLocks'), '.json')]"
         },
+        "vaultSku": "Standard",
         "uniqueString": "[uniqueString(subscription().id)]",
         "diagnosticStorageAccountName": "[toLower( substring( replace( concat( parameters('keyVaultName'), variables('uniqueString'), variables('uniqueString') ), '-', ''), 0, 23) )]"
     },
     "resources": [
         {
+            "type": "Microsoft.Storage/StorageAccounts",
+            "name": "[parameters('storageAcctName')]",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2018-07-01",
+            "sku": {
+                "Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "properties": {}
+        },
+        {
             "type": "Microsoft.KeyVault/vaults",
             "name": "[parameters('keyVaultName')]",
             "apiVersion": "2018-02-14",
-            "location": "[parameters('location')]",
+            "location": "[resourceGroup().location]",
             "tags": {
                 "displayName": "Key Vault with logging"
             },
             "properties": {
-                "enabledForDeployment": "[parameters('enableVaultForDeployment')]",
-                "enabledForTemplateDeployment": "[parameters('enableVaultForTemplateDeployment')]",
-                "enabledForDiskEncryption": "false",
-                "tenantId": "[parameters('tenantId')]",
+                "enabledForDeployment": false,
+                "enabledForTemplateDeployment": true,
+                "enabledForDiskEncryption": false,
+                "tenantId": "[subscription().tenantId]",
                 "accessPolicies": [],
                 "sku": {
-                    "name": "[parameters('vaultSku')]",
+                    "name": "[variables('vaultSku')]",
                     "family": "A"
                 }
             },
@@ -116,7 +81,7 @@
                     "type": "Microsoft.KeyVault/vaults/providers/diagnosticsettings",
                     "name": "[concat(parameters('keyVaultName'), '/Microsoft.Insights/service')]",
                     "apiVersion": "2016-09-01",
-                    "location": "[parameters('location')]",
+                    "location": "[resourceGroup().location]",
                     "dependsOn": [
                         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
                         "[resourceId('Microsoft.Storage/storageAccounts', variables('diagnosticStorageAccountName'))]"
@@ -141,7 +106,7 @@
             "type": "Microsoft.Storage/storageAccounts",
             "name": "[variables('diagnosticStorageAccountName')]",
             "apiVersion": "2018-07-01",
-            "location": "[parameters('location')]",
+            "location": "[resourceGroup().location]",
             "sku": {
                 "name": "Standard_LRS"
             },
