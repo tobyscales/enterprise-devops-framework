@@ -50,7 +50,7 @@ A separate directory contains configuration and secret files for managing all Az
     └── globals.tfvars
 
 
-The *certs* folder contains [authentication certificates](#ServiceAuthentication) and the *tools* folder contains the shell scripts and cross-platform PowerShell that power the solution.
+The *certs* folder contains [authentication certificates](#service-authentication--security) and the *tools* folder contains the shell scripts and cross-platform PowerShell that power the solution.
 
 Subscription-specific secrets (such as client_id, tenant_id and subscription_id) are stored in *secrets.tfvars*. Terraform [backend configuration](https://www.terraform.io/docs/backends/types/azurerm.html) is stored in Key Vault, and *globals.tfvars* holds various global variables such as username and env.
 
@@ -68,10 +68,7 @@ This approach delivers solid MFA for developer machines without being a nuisance
 
 ## Installing & Configuring
 To set up the Enterprise DevOps Framework, simply 
-```
-git clone https://github.com/tescales/enterprise-devops-framework.git
-```
-on your development machine, cd to the /config/tools folder and run 
+`git clone https://github.com/tescales/enterprise-devops-framework.git` on your development machine, cd to the /config/tools folder and run 
 
 ```
 ./Initialize-EDOSubscription.ps1
@@ -86,9 +83,8 @@ This script will perform the following actions:
 
  Once the Initialize-EDOSubscription script has been run, the secrets.tfvars file and associated certificates can be distributed to developers *without granting them further access to the Azure subscription*. In other words, a central Azure Administrators team with "Ring 0" access can now delegate access to Ring 1 Terraform developers with ease.
 
-```
-To maintain full separation between authentication factors, never share the certificates AND the certificate passwords in the same communication channel! 
 
-Like, don't email them around, okay?
-```
+>To maintain full separation between authentication factors, never share the certificates AND the certificate passwords in >the same communication channel! 
+>
+>Like, don't email them around, okay?
 
