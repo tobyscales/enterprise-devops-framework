@@ -67,7 +67,10 @@ Additionally, the information stored in secrets.tfvars is single-factor by desig
 This approach delivers solid MFA for developer machines without being a nuisance.
 
 ## Installing & Configuring
-To set up the Enterprise DevOps Framework, simply 
+### Prerequisite: Install PowerShell Core
+If you haven't already (and why haven't you??), install Powershell Core for your OS following [these instructions](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-6#powershell-core).
+
+Once that's done, simply 
 `git clone https://github.com/tescales/enterprise-devops-framework.git` on your development machine, cd to the /config/tools folder and run 
 
 ```

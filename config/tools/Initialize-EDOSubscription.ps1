@@ -30,6 +30,8 @@
 
 $ErrorActionPreference='SilentlyContinue'
 
+#TODO: Set-PSRepository to change InstallationPolicy for PSGallery
+
 write-host "Checking Prerequisites..."
 if (-not (get-module Az.Accounts)) { Install-Module -Name Az.Accounts -AllowClobber -Scope CurrentUser -repository PSGallery }
 if (-not (get-module Az.Keyvault)) { Install-Module -Name Az.Keyvault -AllowClobber -Scope CurrentUser -repository PSGallery }
@@ -45,8 +47,9 @@ $startPath = $pwd.path
 $configPath = "$($startPath.Substring(0, $startPath.indexof("live")))config"
 #$subId = [regex]::Match($startPath, 's[0-9a-fA-F]{5}') #regex match the subscription ID in the path
 
-
-if (-not (get-azsubscription)) {  
+try { 
+    get-azsubscription
+} catch {
     Connect-AzAccount
 }
 
@@ -74,11 +77,11 @@ $subalias = "s" + $selected_subscription.SubscriptionId.Substring(0,5)
 
 #TODO: add key vault creation option
 #TODO: show resource group next to key vault name
-$keyvaults = get-azkeyvault | sort -Property VaultName
+$keyvaults = get-azkeyvault | Sort-Object -Property VaultName
 do {
 
     $i = 1
-    foreach ($kv in $keyvaults | sort) {
+    foreach ($kv in $keyvaults | Sort-Object) {
         write-host "$($i) - $($kv.VaultName)" 
         $i++
     }
