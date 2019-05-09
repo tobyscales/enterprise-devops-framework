@@ -14,7 +14,7 @@
             "metadata": {
                 "description": "Specifies the name of the Ring 0 Storage Account."
             },
-            "defaultValue": "edof-ring0-sa"
+            "defaultValue": "edoftfstatefiles"
         },
         "logsRetentionInDays": {
             "type": "int",
@@ -24,35 +24,26 @@
             "metadata": {
                 "description": "Specifies the number of days that logs will be kept. If you do not want to apply any retention policy and retain data forever, set value to 0."
             }
-        },
-        "_artifactsLocation": {
-            "type": "object",
-            "metadata": {
-                "description": "The location of resources, such as templates and DSC modules, that the template depends on. Don't change unless you need to!"
-            },
-            "defaultValue": {
-                "thisUrl": "https://raw.githubusercontent.com/tescales/enterprise-devops-framework/bootstrap/",
-                "rootUrl": "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-key-vault-with-logging-create/"
-            }
         }
     },
     "variables": {
         "protectWithLocks": "enabled",
         "template": {
+            "thisUrl": "https://raw.githubusercontent.com/tescales/enterprise-devops-framework/bootstrap/",
+            "rootUrl": "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-key-vault-with-logging-create/",
             "protectWithLocks": "[concat('nestedtemplates/protectwithlocks', variables('protectWithLocks'), '.json')]"
         },
         "vaultSku": "Standard",
-        "uniqueString": "[uniqueString(subscription().id)]",
-        "diagnosticStorageAccountName": "[toLower( substring( replace( concat( parameters('keyVaultName'), variables('uniqueString'), variables('uniqueString') ), '-', ''), 0, 23) )]"
+        "diagnosticStorageAccountName": "[take(toLower( replace( concat( parameters('keyVaultName'), 'auditlogs' ), '-', '') ),23)]"
     },
     "resources": [
         {
-            "type": "Microsoft.Storage/StorageAccounts",
+            "type": "Microsoft.Storage/storageAccounts",
             "name": "[parameters('storageAcctName')]",
             "location": "[resourceGroup().location]",
             "apiVersion": "2018-07-01",
             "sku": {
-                "Standard_LRS"
+                "name": "Standard_LRS"
             },
             "kind": "StorageV2",
             "properties": {}
@@ -63,7 +54,7 @@
             "apiVersion": "2018-02-14",
             "location": "[resourceGroup().location]",
             "tags": {
-                "displayName": "Key Vault with logging"
+                "displayName": "EDOF Ring0 Key Vault"
             },
             "properties": {
                 "enabledForDeployment": false,
@@ -127,7 +118,7 @@
             "properties": {
                 "mode": "Incremental",
                 "templateLink": {
-                    "uri": "[uri(parameters('_artifactsLocation').rootUrl, concat(variables('template').protectWithLocks))]",
+                    "uri": "[uri(variables('template').rootUrl, concat(variables('template').protectWithLocks))]",
                     "contentVersion": "1.0.0.0"
                 },
                 "parameters": {
