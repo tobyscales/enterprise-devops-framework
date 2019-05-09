@@ -41,6 +41,10 @@ import-module az.keyvault
 import-module az.storage
 import-module SelfSignedCertificate 
 
+$startPath = $pwd.path
+$configPath = "$($startPath.Substring(0, $startPath.indexof("live")))config"
+#$subId = [regex]::Match($startPath, 's[0-9a-fA-F]{5}') #regex match the subscription ID in the path
+
 
 if (-not (get-azsubscription)) {  
     Connect-AzAccount
@@ -69,6 +73,7 @@ set-azcontext -SubscriptionObject $selected_subscription > $null
 $subalias = "s" + $selected_subscription.SubscriptionId.Substring(0,5)
 
 #TODO: add key vault creation option
+#TODO: show resource group next to key vault name
 $keyvaults = get-azkeyvault | sort -Property VaultName
 do {
 
@@ -114,7 +119,8 @@ $certificateParams = @{
     keyUsage = 'DigitalSignature'
     FriendlyName = "$certificateName"
 }
-$cert = New-SelfSignedCertificate @certificateParams -force -OutCertPath "..\certs\$subalias"
+#TODO: add error-checking to ensure cert is ACTUALLY created (false output from module)
+$cert = New-SelfSignedCertificate @certificateParams -force -OutCertPath "$configPath\certs\$subalias.$username.pfx"
 $certb64 = [System.Convert]::ToBase64String($cert.RawData)
 
 #TODO: add error-checking/catching code
@@ -130,6 +136,7 @@ New-AzADSpCredential -ServicePrincipalName $mySP.ServicePrincipalNames[1] -CertV
 
 $key1 = (Get-AzStorageAccountKey -ResourceGroupName $selected_sa.ResourceGroupName -Name $selected_sa.StorageAccountName).Value[0]
 
+#add error-checking to ensure secrets are actually stored
 write-host "Storing secrets..."
 Set-AzKeyVaultSecret -VaultName $selected_kv.VaultName -name "$subalias-storageacct" -SecretValue (convertto-securestring $selected_sa.StorageAccountName -AsPlainText -Force)
 Set-AzKeyVaultSecret -VaultName $selected_kv.VaultName -name "$subalias-storagekey" -SecretValue (convertto-securestring $key1 -AsPlainText -Force)
@@ -137,3 +144,5 @@ Set-AzKeyVaultSecret -VaultName $selected_kv.VaultName -name "$subalias-storagek
 Set-AzKeyVaultAccessPolicy -VaultName $selected_kv.VaultName -ServicePrincipalName $mySP.ServicePrincipalNames[1] -PermissionsToSecrets get
 
 write-host "User deployer.$subalias.$username successfully configured to deploy to $($selected_subscription.Name) using $($selected_kv.VaultName)."
+
+#TODO: optionally create/update secrets.tfvars
