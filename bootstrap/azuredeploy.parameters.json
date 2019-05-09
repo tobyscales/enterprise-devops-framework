@@ -2,26 +2,8 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "keyVaultName": {
-            "value": "edof-ring0-kv"
-        },
-        "enableVaultForDeployment": {
-            "value": false
-        },
-        "enableVaultForTemplateDeployment": {
-            "value": false
-        },
-        "vaultSku": {
-            "value": "Standard"
-        },
         "protectWithLocks": {
             "value": "enabled"
-        },
-        "_artifactsLocation": {
-            "value": {
-                "thisUrl": "https://raw.githubusercontent.com/tescales/enterprise-devops-framework/bootstrap/",
-                "rootUrl": "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-key-vault-with-logging-create/"
-            }
         }
     }
 }
