@@ -84,7 +84,7 @@
       "template": {
         "protectWithLocks": "[concat('nestedtemplates/protectwithlocks', parameters('protectWithLocks'), '.json')]"
       },
-      "uniqueString": "[uniqueString(subscription().id, resourceGroup().id)]",
+      "uniqueString": "[uniqueString(subscription().id)]",
       "diagnosticStorageAccountName": "[toLower( substring( replace( concat( parameters('keyVaultName'), variables('uniqueString'), variables('uniqueString') ), '-', ''), 0, 23) )]"
     },
     "resources": [
@@ -99,8 +99,10 @@
         "properties": {
           "enabledForDeployment": "[parameters('enableVaultForDeployment')]",
           "enabledForTemplateDeployment": "[parameters('enableVaultForTemplateDeployment')]",
-          "enabledForDiskEncryption": "[parameters('enableVaultForDiskEncryption')]",
+          "enabledForDiskEncryption": "false",
           "tenantId": "[parameters('tenantId')]",
+          "accessPolicies": [
+          ],
           "sku": {
             "name": "[parameters('vaultSku')]",
             "family": "A"

@@ -6,10 +6,10 @@
             "value": "edof-ring0-kv"
         },
         "enableVaultForDeployment": {
-            "value": "false"
+            "value": false
         },
         "enableVaultForTemplateDeployment": {
-            "value": "false"
+            "value": false
         },
         "vaultSku": {
             "value": "Standard"
