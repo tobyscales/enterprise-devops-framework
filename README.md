@@ -3,13 +3,14 @@
 
 The goal of this project is to allow for a more natural interface between Terraform and Azure.
 
-The building blocks of this system are certificate-based authentication, Azure Key Vault and PowerShell Core, which provides cross-platform compatibility and security.
+This solution adapts the familiar concept of [Protection Rings](https://en.wikipedia.org/wiki/Protection_ring) to the cloud. At the center of the solution is a "ring0" Key Vault which stores the deployment secrets necessary for proper Terraform operation (in this case the backend.tf configuration) but limits access to named service prinipals, allowing for easy auditing of deployment operations.
+
+![Solution Design](/media/Enterprise-Devops-Framework-Azure.png)
 
 ## Installing & Configuring
 ### Bootstrap Configuration: Ring0 Resources
-This solution adapts the familiar concept of [Protection Rings](https://en.wikipedia.org/wiki/Protection_ring) to the cloud. At the center of the solution is a "ring0" Key Vault which stores the deployment secrets necessary for proper Terraform operation (in this case the backend.tf configuration) but limits access to named service prinipals, allowing for easy auditing of deployment operations.
 
-This ring0 resource and associated logging can be deployed by clicking the button below, which utilizes sensible defaults to install the ring0 key vault in the subscription and region of your choice. Alternatively, you can download the templates directly and modify them as you like.
+The ring0 resource and associated logging can be deployed by clicking the button below, which utilizes sensible defaults to install the ring0 key vault in the subscription and region of your choice. Alternatively, you can download the templates directly and modify them as you like.
 
 <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fazuredeploy.json" target="_blank">
     <img src="http://azuredeploy.net/deploybutton.png"/>
