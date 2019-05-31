@@ -3,9 +3,11 @@
 
 The goal of this project is to allow for a more natural interface between Terraform and Azure.
 
-This solution adapts the familiar concept of [Protection Rings](https://en.wikipedia.org/wiki/Protection_ring) to the cloud. At the center of the solution is a "ring0" Key Vault which stores the deployment secrets necessary for proper Terraform operation (in this case the backend.tf configuration) but limits access to named service prinipals, allowing for easy auditing of deployment operations.
+This solution adapts the familiar concept of [Protection Rings](https://en.wikipedia.org/wiki/Protection_ring) to the cloud. At the center of the solution is a "ring0" Key Vault which stores the master credentials for less-privileged Service Principal accounts. A "ring1" Key Vault stores the configuration details necessary for proper Terraform operation (in this case the backend.tf configuration) and developers are only granted access to Azure through these Service Principal accounts.
 
-![Solution Design](/media/Enterprise-Devops-Framework-Azure.png)
+Thus programmatic access is predictably granted and click-ops discouraged -- all without sacrificing security, auditability or ease-of-use.
+
+![Solution Design](/media/Enterprise-Devops-Framework-Azure-v1.png)
 
 ## Installing & Configuring
 ### Administrative Jumpbox Prerequisite: PowerShell Core
@@ -19,7 +21,8 @@ For this first release, Developer PCs will also require PSCore installed. Howeve
 
 The ring0 and ring1 resources can be deployed by clicking the buttons below. The paramter files in this repo utilize sensible defaults to install a ring0 key vault with audit logging (for storing authentication credentials), a ring1 key vault (for storing backend configuration) and a ring1 storage account for storing terraform.tfstate files. 
 
-Ring 0: <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring0.json" target="_blank"> <img src="http://azuredeploy.net/deploybutton.png"/>  </a> Ring 1:<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring1.json" target="_blank">
+Ring 0: <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring0.json" target="_blank"> <img src="http://azuredeploy.net/deploybutton.png"/>  </a> 
+Ring 1:<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring1.json" target="_blank">
     <img src="http://azuredeploy.net/deploybutton.png"/>
 </a>
 
