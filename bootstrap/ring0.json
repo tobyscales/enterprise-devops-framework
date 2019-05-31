@@ -6,8 +6,7 @@
             "type": "string",
             "metadata": {
                 "description": "Specifies the name of the Ring 0 Key Vault."
-            },
-            "defaultValue": "edof-ring0-kv"
+            }
         },
         "storageAcctName": {
             "type": "string",
