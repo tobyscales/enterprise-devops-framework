@@ -53,7 +53,7 @@ The bootstrap script will perform the following actions:
 ***
 
 ## File System Layout
-Building on the framework established by [Gruntwork/terragrunt](https://www.gruntwork.io), the Enterprise DevOps Framework for Azure utilizes a blended file structure that supports the use of Terraform modules (https://www.terraform.io/docs/modules/index.html) as well as “direct” Terraform configurations. 
+Building on the framework established by [Gruntwork/terragrunt](https://www.gruntwork.io), the Enterprise DevOps Framework for Azure utilizes a blended file structure that supports the use of [Terraform modules](https://www.terraform.io/docs/modules/index.html) as well as “direct” Terraform configurations. 
 
 Each subscription is represented by a single folder, which holds all resource groups underneath it as additional folders.
 

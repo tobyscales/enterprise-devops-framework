@@ -4,6 +4,10 @@
 .COMPANYNAME Microsoft Corporation
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
+    Requires PowerShellCore. If not found, will install the following modules into the User Scope:
+    - Az.Accounts
+    - Az.Storage
+    - Az.KeyVault
 .REQUIREDSCRIPTS
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
@@ -14,13 +18,30 @@
 <#
 
 .SYNOPSIS
-    Creates a deployment user and assigns permissions to Ring1 resources as part of the Enterprise DevOps Framework for Azure.
+    Creates a deployment user and assigns permissions to manage target resources as part of the Enterprise DevOps Framework for Azure.
 
 .DESCRIPTION
+    Requires PSCore. By default, will install required dependencies to the User Scope. Use -SkipPrereqs to skip.
+    Service Principal will be created with the prefix deployer* for easy integration into other user management processes.
 
-.PARAMETER SkipPrerequisiteCheck
+.PARAMETER UserName
+    MANDATORY - The username of the person who will have a deployer* Service Principal assigned for their deployments. 
+    This information will be stored in the Key Vault auditing logs so be sure to use clearly named users!
 
-.PARAMETER LaunchWhenDone
+.PARAMETER Ring0KeyVaultName
+    MANDATORY - The name of Ring 0 Key Vault, which will be used to generate and store authentication certificates for the deployer* Service Principals.
+
+.PARAMETER Ring1KeyVaultName
+    OPTIONAL - The name of the Ring 1 Key Vault. If not specified, the Ring 0 Key Vault will be used.
+
+.PARAMETER TargetSubscriptionId
+    MANDATORY - The SubscriptionId that the deployer* Service Principal will be used to manage.
+
+.PARAMETER TFStorageAccountName
+    MANDATORY - Name of the storage account to store the terraform.tfstate files. I may take this option away in v2 to make it simpler.
+
+.PARAMETER SkipPrereqs
+    OPTIONAL - Save time when running the script multiple times! Add the -SkipPrereqs switch today.
 
 .EXAMPLE
 
@@ -40,19 +61,16 @@ Function New-EDOFUser {
         [string[]]$UserName,
         [Parameter(Mandatory = $true)]
         [string[]]$Ring0KeyVaultName,
-        [Parameter(Mandatory = $true)]
         [string[]]$Ring1KeyVaultName,
         [Parameter(Mandatory = $true)]
-        [string[]]$targetSubscriptionId,
+        [string[]]$TargetSubscriptionId,
         [Parameter(Mandatory = $true)]
         [string[]]$TFStorageAccountName,
-        [Parameter(Mandatory = $true)]
-        [string[]]$SubscriptionId,
-        [switch]$SkipPrerequisiteCheck
+        [switch]$SkipPrereqs
     )
     Begin {
 
-        if ($SkipPrerequisiteCheck) {
+        if ($SkipPrereqs) {
             Set-PSRepository -Name PSGallery -InstallationPolicy Trusted 
 
             write-host "Checking Prerequisites..."
@@ -65,10 +83,13 @@ Function New-EDOFUser {
             import-module az.storage
         }
 
+        if (-not $Ring1KeyVaultName) { $Ring1KeyVaultName = $Ring0KeyVaultName }
+
         $startPath = (get-item $PSScriptRoot).Parent.FullName
         $configPath = (join-path $startPath "config")
         $certPath = (join-path $configPath "certs")
         
+        new-item -ItemType Directory -Path $configPath -force | Out-Null
         new-item -ItemType Directory -Path $certPath -force | Out-Null
 
         $secrets = @()
@@ -84,11 +105,11 @@ Function New-EDOFUser {
 
     Process {
         
-        $targetTenantId = (Get-AzSubscription -SubscriptionId $targetSubscriptionId).TenantId 
+        $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId).TenantId 
         $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccount }) 
     
         $cert = $null
-        $subalias = "s" + $targetSubscriptionId.Substring(0, 5)
+        $subalias = "s" + $TargetSubscriptionId.Substring(0, 5)
         $certificateName = "deployer.$subalias.$username".trim()
 
         $pfxPath = (join-path $certPath "$subalias.$username.pfx")
@@ -138,7 +159,7 @@ Function New-EDOFUser {
         write-host "User deployer.$subalias.$username successfully created, credentials stored in $($ring0KeyVaultName)."
 
         write-host "Assigning to target subscription" #TODO: add RoleDefinition param
-        New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$targetSubscriptionId" | Out-Null
+        New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$TargetSubscriptionId" | Out-Null
 
         $key1 = (Get-AzStorageAccountKey -ResourceGroupName $tfStorageAccount.ResourceGroupName -Name $tfStorageAccount.StorageAccountName).Value[0]
 
@@ -156,7 +177,7 @@ Function New-EDOFUser {
             'client_id'       = "$($mySP.ApplicationId)"
             'keyvault'        = $Ring1KeyVaultName
             'keyvault_rg'     = "$($ring1KeyVault.ResourceGroupName)"
-            'subscription_id' = $targetSubscriptionId
+            'subscription_id' = $TargetSubscriptionId
             'tenant_id'       = $targetTenantId
             'storageacct'     = "$saURL"
             'storagekey'      = "$skURL"
