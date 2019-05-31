@@ -8,64 +8,58 @@ This solution adapts the familiar concept of [Protection Rings](https://en.wikip
 ![Solution Design](/media/Enterprise-Devops-Framework-Azure.png)
 
 ## Installing & Configuring
-### Bootstrap Configuration: Ring0 Resources
-
-The ring0 resource and associated logging can be deployed by clicking the button below, which utilizes sensible defaults to install the ring0 key vault in the subscription and region of your choice. Alternatively, you can download the templates directly and modify them as you like.
-
-Ring 0: <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring0.json" target="_blank">
-    <img src="http://azuredeploy.net/deploybutton.png"/>
-</a>
-
-Ring 1:<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring1.json" target="_blank">
-    <img src="http://azuredeploy.net/deploybutton.png"/>
-</a>
-
-### Developer PC Prerequisite: Install PowerShell Core
+### Administrative Jumpbox Prerequisite: PowerShell Core
 If you haven't already (and why haven't you??), install Powershell Core for your OS following [these instructions](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-6#powershell-core).
 
-(Obviously you're also going to need [terraform](https://www.terraform.io/downloads.html) installed in your path somewhere.)
+Your Jumpbox is used to configure new access for Terraform developers using the `New-EDOFUser.ps1` command.
 
-Once that's done, simply 
-`git clone https://github.com/tescales/enterprise-devops-framework.git` on your development machine, cd to the /bootstrap folder and run 
+For this first release, Developer PCs will also require PSCore installed. However that requirement will go away in the next release, when the Get-Config and Get-Backend logic are moved to an AAD-secured Azure Function.
 
-```
-./Set-EDOFSubscription.ps1
-```
+### Bootstrap Configuration: Easy Button
 
-This script will perform the following actions:
- * Deploy a "Ring0" Key Vault and Storage Account for storing secrets and tfstate files, respectively.
- * Create the /live folder structure described above for selected Subscriptions.
- * Create a deployment Service Principal and grant it Contributor access to selected Subscriptions. The deployment SP will be created with the following naming convention: deployer.subalias.username.
- * Store the accesskey for the Storage Account in the Ring0 Key Vault, then grant the SP access to read those secrets.
- * Create a self-signed certificate in /certs/subalias.username.pfx which can be used to securely access the configuration information.
+The ring0 and ring1 resources can be deployed by clicking the buttons below. The paramter files in this repo utilize sensible defaults to install a ring0 key vault with audit logging (for storing authentication credentials), a ring1 key vault (for storing backend configuration) and a ring1 storage account for storing terraform.tfstate files. 
 
- (NOTE: These actions will be performed under the context of the logged-in user; so it is assumed they will be run by a user with User Administration Rights on the Subscription, Reader rights on the Storage Account and Owner permissions on the Key Vault.)
+Ring 0: <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring0.json" target="_blank"> <img src="http://azuredeploy.net/deploybutton.png"/>  </a> Ring 1:<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring1.json" target="_blank">
+    <img src="http://azuredeploy.net/deploybutton.png"/>
+</a>
 
- Once the Initialize-EDOSubscription script has been run, the secrets.tfvars file and associated certificates can be distributed to developers *without granting them further access to the Azure subscription*. In other words, a central Azure Administrators team with "Ring 0" access can now delegate access to Ring 1 Terraform developers with ease.
+Once you have deployed these Ring0/1 resources, you can [download](https://raw.githubusercontent.com/tescales/enterprise-devops-framework/master/scripts/New-EDOFUser.ps1) and run `New-EDOFUser.ps1` to create new users and assign them access. Additional information is available in the header of that script.
+
+Once the process is complete and a new user is created, the secrets.tfvars file and associated certificates can be distributed to developers *without granting them further access to the Azure subscription*. In other words, a central Azure Administrators team with "Ring 0" access can now delegate access to Ring 1 Terraform developers with ease.
 
 > !!! NOTE !!!
 >To maintain full separation between authentication factors, never share the certificates AND the certificate passwords in the same communication channel! 
 >
 >Like-- don't email them around together, okay?
 
+### Bootstrap Configuration: Great Power/Responsibility
+For more control and/or ongoing production use, `git clone` this repo to your Administrative jumpbox and edit the parameter files in /bootstrap for your environment. Then run /scripts/bootstrap.ps1 to configure.
+
+The bootstrap script will perform the following actions:
+ * Deploy a "Ring0" and Ring1 Key Vault for storing credentials and backend configuration files, respectively.
+ * Create the /live folder structure described below for selected Subscriptions.
+ * Create a deployment Service Principal and grant it Contributor access to the target Subscription. 
+   NOTE: The deployment SP will be created with the naming convention deployer.subalias.username.
+ * Create a certificate in /certs/subalias.username.pfx with a randomized password which can be used to logon as the deployment SP.
+ * Store the authentication certificate in the Ring0 KeyVault.
+ * Store the accesskey for the Storage Account in the Ring1 Key Vault, and grant the SP access to read those secrets.
+
+
 ## File System Layout
-Building on the framework established by [Gruntwork/terragrunt](https://www.gruntwork.io), we utilize a blended file structure that supports the use of Terraform modules (https://www.terraform.io/docs/modules/index.html) as well as “direct” Terraform configurations. 
+Building on the framework established by [Gruntwork/terragrunt](https://www.gruntwork.io), the Enterprise DevOps Framework for Azure utilizes a blended file structure that supports the use of Terraform modules (https://www.terraform.io/docs/modules/index.html) as well as “direct” Terraform configurations. 
 
 Each subscription is represented by a single folder, which holds all resource groups underneath it as additional folders.
 
 The *live* folder contains the currently deployed infrastructure code, while the *modules* folder contains generalized templates for use in multiple configurations.
 
-Each pair-deployed Azure Subscription (prod/dev) has its own folder structure. This allows development to take place in the _dev folder without impacting production:
-
     live
-    ├── s123de_This_Great_Subscription_dev 
-    │   └── resource_group
+    ├── s123de_This_Great_Subscription 
+    │   └── resource_group_abc
     │   │      └── main.tf
     │   │      └── required.tf
     │   │      └── terraform.tfvars
     │   │      └── variables.tf
-    ├── sabc45_This_Great_Subscription_prod 
-    │   └── resource_group
+    │   └── resource_group_def
     │          └── main.tf
     │          └── required.tf
     │          └── terraform.tfvars
@@ -78,13 +72,13 @@ Each pair-deployed Azure Subscription (prod/dev) has its own folder structure. T
 
 Additionally, each subscription folder is prefixed with a 6-digit code based on the subscription GUID, which is referred to in this documentation as the "Subscription Alias." 
 
-The Subscription Alias is used as a lookup value in the Terraform provider file, and generally as a lookup key for secrets stored in Key Vault.
+The Subscription Alias is used as a lookup value in the Terraform provider file, and as a lookup for secrets stored in Key Vault.
 
 ## Configuration Files
 A separate directory contains configuration and secret files for managing all Azure subscriptions:
 
     config
-    ├── tools 
+    ├── scripts 
     ├── certs
     │   └── s123de.username.pfx
     │   └── sabc12.username.pfx
@@ -92,10 +86,9 @@ A separate directory contains configuration and secret files for managing all Az
     └── secrets.tfvars
     └── globals.tfvars
 
+The *certs* folder contains [authentication certificates](#service-authentication--security) and the *scripts* folder contains the shell scripts and cross-platform PowerShell that power the solution.
 
-The *certs* folder contains [authentication certificates](#service-authentication--security) and the *tools* folder contains the shell scripts and cross-platform PowerShell that power the solution.
-
-Subscription-specific secrets (such as client_id, tenant_id and subscription_id) are stored in *secrets.tfvars*. Terraform [backend configuration](https://www.terraform.io/docs/backends/types/azurerm.html) is stored in Key Vault, and *globals.tfvars* holds various global variables such as username and env.
+Subscription-specific secrets (such as client_id, tenant_id and subscription_id) are stored in *secrets.tfvars*. Terraform [backend configuration](https://www.terraform.io/docs/backends/types/azurerm.html) is stored in the Ring1 Key Vault, and *globals.tfvars* holds various global variables such as username and env.
 
 A single, generic *provider.tf* file provides access to all subscriptions. 
 
@@ -109,7 +102,10 @@ Additionally, the information stored in secrets.tfvars is single-factor by desig
 This approach delivers solid MFA for developer machines without being a nuisance.
 
 ## TODO:
- * Add support for ARM templates
- * Move Get-Backend logic into an Azure Function so the whole shebang can be run with shell/batch scripts and not require PSCore installed locally.
- * Set- or Grant- script with optional parameters for: ring0 KV, Deployer ManagementGroup, TFstate-per-sub, etc.
- * Initialize- script with subscription creation & MG assignment
+ * Move Get-Backend logic into an Azure Function so the whole shebang can be run with shell/batch scripts and not require PSCore installed on Dev PCs.
+ * Add support for deploying ARM templates
+ * Add support for user access other than Contributor
+ * Add support for Management Groups instead of direct assignment
+ * Add certificate auto-renewal
+ * Add ACME support for LetsEncrypt-signed certs
+ * Initialize- script with automated subscription/ring1 resource and access creation
