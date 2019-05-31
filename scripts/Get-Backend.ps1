@@ -2,14 +2,20 @@ $ErrorActionPreference = 'Stop'
 
 #region Functions
 Function Get-TFData {
-    param( [string]$filePath, [string]$masterKey )
+    param( [string]$filePath, [string]$masterKey, [switch]$asObject = $false )
 
-    $masterKey = $masterKey.ToLower()
+    $rawFiledata = (Get-Content -path $filePath -Raw) 
+    $tfblock = ($rawFiledata | select-string -Pattern "(?smi)$masterkey.+?{.+?[}]" | foreach-object { $_.matches.value })
 
-    $rawFiledata = (Get-Content -path $filePath -Raw).ToLower() # | Where-Object { ( (-not ($_.StartsWith('#'))) ) }
-    $endbracket = $rawFiledata.indexOf('}', $rawFiledata.IndexOf($masterKey)) - $rawFiledata.IndexOf($masterKey) + 1
-    $bracketed_string = (Get-Content -path $filePath -Raw).substring($rawFiledata.indexOf($masterKey), $endbracket) #re-use original because lowercase!
-    return ($bracketed_string.substring($bracketed_string.indexOf('{') + 1)).Trim('{', '}') | ConvertFrom-StringData
+    if ($asObject) {
+        #trim the brackets off our Terraform block
+        $tfblock = $tfblock -replace "(?m)$masterkey.+?{", ""
+        $tfblock = $tfblock -replace "}$", ""
+
+        return $tfblock | ConvertFrom-StringData
+    } else {
+        return $tfblock
+    }
 }
 function Get-OAuth2Uri
 (
@@ -124,6 +130,7 @@ write-host "Checking Prerequisites..."
 #TODO: check for AzureAD module dependencies
 
 #TODO: add error-checking for $configPath
+#TOFIX: pull entire config from subscription alias
 $startPath = $pwd.path
 $configPath = "$($startPath.Substring(0, $startPath.indexof("live")))config"
 $subId = [regex]::Match($startPath, 's[0-9a-fA-F]{5}') #regex match the subscription ID in the path
@@ -135,15 +142,15 @@ if (-not $subId.Success) { write-error "Could not find subscription reference in
     $username = ((Get-Content -path "$configPath\globals.tfvars").ToLower() | Where-Object { ( (($_.StartsWith('user'))) ) }).split('=')[1].trim('"', ' ')
     $certPath = "$configPath\certs\$subId.$username.pfx" 
 
-    #TODO: Cleanup cert pass
+    #TOFIX: Cleanup cert pass
     $certpass = ConvertTo-SecureString "hi" -AsPlainText -Force
     
-    $kvResourceGroups = Get-TFData "$configPath\secrets.tfvars" "keyvault_rgs" 
-    $kvVaults = Get-TFData "$configPath\secrets.tfvars" "keyvaults" 
-    $clientIds = Get-TFData "$configPath\secrets.tfvars" "clientids"
-    $tenantIds = Get-TFData "$configPath\secrets.tfvars" "tenantids"
-    #$clientSecrets = Get-TFData "$configPath\secrets.tfvars" "clientsecrets"
-    $backends = Get-TFData "$configPath\secrets.tfvars" "backends"
+    $kvResourceGroups = Get-TFData "$configPath\secrets.tfvars" "keyvault_rgs" -asObject
+    $kvVaults = Get-TFData "$configPath\secrets.tfvars" "keyvaults" -asObject
+    $clientIds = Get-TFData "$configPath\secrets.tfvars" "clientids" -asObject
+    $tenantIds = Get-TFData "$configPath\secrets.tfvars" "tenantids" -asObject
+    #$clientSecrets = Get-TFData "$configPath\secrets.tfvars" "clientsecrets" -asObject
+    $backends = Get-TFData "$configPath\secrets.tfvars" "backends" -asObject
 
     foreach ($rg in $kvResourceGroups.KEYS.GetEnumerator()) {
         if ($rg -eq $subId) {

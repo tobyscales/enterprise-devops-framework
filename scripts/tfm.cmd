@@ -5,7 +5,7 @@ set config_dir=%~dp0..\
 set _psrun=0
 set _psinit=0
 set tfargs=
-
+REM TODO: IF NOT EXIST secrets.tfvars RUN INITIALIZE_DEVPC
 
 for %%a in (.) do set currentfolder=%%~nxa
 set subid=%currentfolder:~0,6%
