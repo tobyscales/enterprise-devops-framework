@@ -12,7 +12,11 @@ This solution adapts the familiar concept of [Protection Rings](https://en.wikip
 
 The ring0 resource and associated logging can be deployed by clicking the button below, which utilizes sensible defaults to install the ring0 key vault in the subscription and region of your choice. Alternatively, you can download the templates directly and modify them as you like.
 
-<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fazuredeploy.json" target="_blank">
+Ring 0: <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring0.json" target="_blank">
+    <img src="http://azuredeploy.net/deploybutton.png"/>
+</a>
+
+Ring 1:<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Ftescales%2Fenterprise-devops-framework%2Fmaster%2Fbootstrap%2Fring1.json" target="_blank">
     <img src="http://azuredeploy.net/deploybutton.png"/>
 </a>
 
