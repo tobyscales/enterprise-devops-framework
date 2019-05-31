@@ -1,0 +1,97 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "keyVaultName": {
+            "type": "string",
+            "metadata": {
+                "description": "Specifies the name of the Ring 1 Key Vault."
+            },
+            "defaultValue": "edof-ring1-kv"
+        },
+        "TFstorageAcctName": {
+            "type": "string",
+            "metadata": {
+                "description": "Specifies the name of the Terraform State Files Account (Ring 1)."
+            },
+            "defaultValue": "edofring1tfstate"
+        }
+    },
+    "variables": {
+        "protectWithLocks": "enabled",
+        "template": {
+            "thisUrl": "https://raw.githubusercontent.com/tescales/enterprise-devops-framework/bootstrap/",
+            "rootUrl": "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-key-vault-with-logging-create/",
+            "protectWithLocks": "[concat('nestedtemplates/protectwithlocks', variables('protectWithLocks'), '.json')]"
+        },
+        "vaultSku": "Standard"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('TFstorageAcctName')]",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2018-07-01",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "properties": {},
+            "resources": [
+                {
+                    "name": "default/tfstatefiles",
+                    "type": "blobServices/containers",
+                    "apiVersion": "2018-07-01",
+                    "dependsOn": [
+                        "[parameters('TFstorageAcctName')]"
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "name": "[parameters('keyVaultName')]",
+            "apiVersion": "2018-02-14",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "EDOF Ring1 Key Vault"
+            },
+            "properties": {
+                "enabledForDeployment": false,
+                "enabledForTemplateDeployment": true,
+                "enabledForDiskEncryption": false,
+                "tenantId": "[subscription().tenantId]",
+                "accessPolicies": [],
+                "sku": {
+                    "name": "[variables('vaultSku')]",
+                    "family": "A"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "name": "protectWithLocks",
+            "apiVersion": "2018-05-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('TFstorageAcctName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[uri(variables('template').rootUrl, concat(variables('template').protectWithLocks))]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "keyVaultName": {
+                        "value": "[parameters('keyVaultName')]"
+                    },
+                    "TFstorageAccountName": {
+                        "value": "[parameters('TFstorageAcctName')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}

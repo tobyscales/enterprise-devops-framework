@@ -6,14 +6,15 @@
             "type": "string",
             "metadata": {
                 "description": "Specifies the name of the Ring 0 Key Vault."
-            }
+            },
+            "defaultValue": "edof-ring0-kv"
         },
-        "storageAcctName": {
+        "keyVaultLoggingStorageAcctName": {
             "type": "string",
             "metadata": {
                 "description": "Specifies the name of the Ring 0 Storage Account."
             },
-            "defaultValue": "edoftfstatefiles"
+            "defaultValue": "[take(toLower( replace( concat( parameters('keyVaultName'), 'logs' ), '-', '') ),23)]"
         },
         "logsRetentionInDays": {
             "type": "int",
@@ -32,13 +33,12 @@
             "rootUrl": "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-key-vault-with-logging-create/",
             "protectWithLocks": "[concat('nestedtemplates/protectwithlocks', variables('protectWithLocks'), '.json')]"
         },
-        "vaultSku": "Standard",
-        "diagnosticStorageAccountName": "[take(toLower( replace( concat( parameters('keyVaultName'), 'auditlogs' ), '-', '') ),23)]"
+        "vaultSku": "Standard"
     },
     "resources": [
         {
             "type": "Microsoft.Storage/storageAccounts",
-            "name": "[parameters('storageAcctName')]",
+            "name": "[parameters('keyVaultLoggingStorageAcctName')]",
             "location": "[resourceGroup().location]",
             "apiVersion": "2018-07-01",
             "sku": {
@@ -74,10 +74,10 @@
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
                         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
-                        "[resourceId('Microsoft.Storage/storageAccounts', variables('diagnosticStorageAccountName'))]"
+                        "[resourceId('Microsoft.Storage/storageAccounts', parameters('keyVaultLoggingStorageAcctName'))]"
                     ],
                     "properties": {
-                        "storageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('diagnosticStorageAccountName'))]",
+                        "storageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('keyVaultLoggingStorageAcctName'))]",
                         "logs": [
                             {
                                 "category": "AuditEvent",
@@ -94,7 +94,7 @@
         },
         {
             "type": "Microsoft.Storage/storageAccounts",
-            "name": "[variables('diagnosticStorageAccountName')]",
+            "name": "[parameters('keyVaultLoggingStorageAcctName')]",
             "apiVersion": "2018-07-01",
             "location": "[resourceGroup().location]",
             "sku": {
@@ -112,7 +112,7 @@
             "apiVersion": "2018-05-01",
             "dependsOn": [
                 "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
-                "[resourceId('Microsoft.Storage/storageAccounts', variables('diagnosticStorageAccountName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('keyVaultLoggingStorageAcctName'))]"
             ],
             "properties": {
                 "mode": "Incremental",
@@ -125,7 +125,7 @@
                         "value": "[parameters('keyVaultName')]"
                     },
                     "diagnosticStorageAccountName": {
-                        "value": "[variables('diagnosticStorageAccountName')]"
+                        "value": "[parameters('keyVaultLoggingStorageAcctName')]"
                     }
                 }
             }
