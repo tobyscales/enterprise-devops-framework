@@ -86,7 +86,7 @@
                     "keyVaultName": {
                         "value": "[parameters('keyVaultName')]"
                     },
-                    "TFstorageAccountName": {
+                    "diagnosticStorageAccountName": {
                         "value": "[parameters('TFstorageAcctName')]"
                     }
                 }
