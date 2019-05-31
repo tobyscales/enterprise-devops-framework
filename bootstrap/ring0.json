@@ -37,17 +37,6 @@
     },
     "resources": [
         {
-            "type": "Microsoft.Storage/storageAccounts",
-            "name": "[parameters('keyVaultLoggingStorageAcctName')]",
-            "location": "[resourceGroup().location]",
-            "apiVersion": "2018-07-01",
-            "sku": {
-                "name": "Standard_LRS"
-            },
-            "kind": "StorageV2",
-            "properties": {}
-        },
-        {
             "type": "Microsoft.KeyVault/vaults",
             "name": "[parameters('keyVaultName')]",
             "apiVersion": "2018-02-14",
