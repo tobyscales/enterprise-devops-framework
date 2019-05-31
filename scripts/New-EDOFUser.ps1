@@ -18,7 +18,7 @@
 
 .DESCRIPTION
 
-.PARAMETER AdditionalExtensions
+.PARAMETER SkipPrerequisiteCheck
 
 .PARAMETER LaunchWhenDone
 
@@ -34,151 +34,64 @@ Function Set-TFData {
 
     (Get-Content -path $filepath) -replace "$masterkey.*$", "$&`n  $stringToAdd" | set-content $filepath -force
 }
-Function Get-UserInputList { 
-    param (
-        [Parameter(Mandatory,
-            Position = 0)]
-        [System.Object[]]$objects, 
-
-        [Parameter(Mandatory,
-            Position = 1)]
-        [string[]]$message)
-
-    #write-host $message
-    if ($objects.count -lt 1) { Write-Error "None found." -ErrorAction Stop; return $false }
-    #write-host $PSBoundParameters.Values
-    #Format-Table $objects -AutoSize
-
-    do {
-        clear-host
-        $i = 1
-        $objects | ForEach-Object { $_ | Add-Member -NotePropertyName Choice -NotePropertyValue $i -Force -PassThru; $i++ } | select Choice, *Name | Out-Host
-        $i = read-host -prompt $message
-        $selected_object = $objects[$i - 1]
-
-    } until ($selected_object)
-    return $selected_object
-}
-Function Get-UserInputWithConfirmation($message) {
-    $useThis = "N"
-    while ("Y" -inotmatch $useThis) {
-        clear-host
-        $input = Read-Host $message
-        $useThis = Read-Host "$input, is that correct?"
-        switch ($useThis) {
-            "Y" { }
-            "N" { }
-            default { $useThis = Read-Host "Please enter Y or N" }
-        }
-    }
-    return $input
-}
 Function New-EDOFUser {
-    #TODO: make "interactive" a switch param
     param (
-        [Parameter(
-            Position = 0)]
-        [string[]]$targetSubscriptionId,
-
-        [Parameter]            
+        [Parameter(Mandatory = $true)]
         [string[]]$UserName,
-
-        [Parameter]
+        [Parameter(Mandatory = $true)]
         [string[]]$Ring0KeyVaultName,
-
-        [Parameter]
+        [Parameter(Mandatory = $true)]
+        [string[]]$Ring1KeyVaultName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$targetSubscriptionId,
+        [Parameter(Mandatory = $true)]
         [string[]]$TFStorageAccountName,
-
-        [Parameter]
+        [Parameter(Mandatory = $true)]
         [string[]]$SubscriptionId,
-
-        [Parameter]
-        [switch[]]$Interactive = $false
+        [switch]$SkipPrerequisiteCheck
     )
     Begin {
-        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted 
 
-        write-host "Checking Prerequisites..."
-        if (-not (get-module Az.Accounts)) { if (-not $Dbug) { Install-Module -Name Az.Accounts -AllowClobber -Scope CurrentUser } }
-        if (-not (get-module Az.Keyvault)) { if (-not $Dbug) { Install-Module -Name Az.Keyvault -AllowClobber -Scope CurrentUser } }
-        if (-not (get-module Az.Storage)) { if (-not $Dbug) { Install-Module -Name Az.Storage -AllowClobber -Scope CurrentUser } }
+        if ($SkipPrerequisiteCheck) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted 
 
-        import-module az.accounts
-        import-module az.keyvault
-        import-module az.storage
+            write-host "Checking Prerequisites..."
+            if (-not (get-module Az.Accounts)) { Install-Module -Name Az.Accounts -AllowClobber -Scope CurrentUser } 
+            if (-not (get-module Az.Keyvault)) { Install-Module -Name Az.Keyvault -AllowClobber -Scope CurrentUser } 
+            if (-not (get-module Az.Storage)) { Install-Module -Name Az.Storage -AllowClobber -Scope CurrentUser } 
 
-        $startPath = $pwd.path
-        $configPath = "$($startPath.Substring(0, $startPath.indexof("live")))config"
-        #$subId = [regex]::Match($startPath, 's[0-9a-fA-F]{5}') #regex match the subscription ID in the path
+            import-module az.accounts
+            import-module az.keyvault
+            import-module az.storage
+        }
+
+        $startPath = (get-item $PSScriptRoot).Parent.FullName
+        $configPath = (join-path $startPath "config")
+        $certPath = (join-path $configPath "certs")
+        
+        new-item -ItemType Directory -Path $certPath -force | Out-Null
 
         $secrets = @()
-        
-        if (-not $dbug) {
-            try { 
-                get-azsubscription | Out-Null
-            }
-            catch {
-                Connect-AzAccount
-            }
+
+        try { 
+            get-azsubscription | Out-Null
         }
-
-        switch ($Interactive) {
-            $true {
-                #TODO: add ability to select multiple subscriptions at once?
-                #TODO: add subscription creation option?
-                #TODO: use pure Terraform for cert creation?
-                $subs = Get-AzSubscription
-                $vaults = Get-AzKeyVault
-                $storage_accts = Get-AzStorageAccount
-
-                $ring0Subscription = Get-UserInputList $subs "Choose the Ring 0 Subscription"
-                if (-not $ring0Subscription) { write-error "No Subscriptions found." -ErrorAction Stop }
-                write-host -ForegroundColor yellow "Connecting to subscription $($ring0Subscription.name)..."
-
-                set-azcontext -SubscriptionObject $ring0Subscription > $null
-
-                $ring0KeyVault = Get-UserInputList $vaults "Choose the Ring 0 Key Vault"
-                if (-not $ring0KeyVault) { write-error "No Keyvaults found." -ErrorAction Stop }
-            }
-            $false { }
+        catch {
+            Connect-AzAccount
         }
+                
     }
 
     Process {
-        switch ($Interactive) {
-            $true {
-                #TODO: add ability to select multiple subscriptions at once?
-                #TODO: add subscription creation option?
-                #TODO: use pure Terraform for cert creation?
-
-                $targetSubscription = Get-UserInputList $subs "Choose the Target Subscription"
-                if (-not $targetSubscription) { write-error "No Subscriptions found." -ErrorAction Stop }
-                write-host -ForegroundColor yellow "Connecting to subscription $($targetSubscription.name)..."
-
-                $ring1KeyVault = Get-UserInputList $vaults "Choose the Ring 1 Key Vault for $($targetSubscription.name)"
-                if (-not $ring1KeyVault) { write-error "No Keyvaults found." -ErrorAction Stop }
-
-                $tfStorageAccount = Get-UserInputList $storage_accts "Choose the Terraform State file Storage Account for $($targetSubscription.name)"
-                if (-not $tfStorageAccount) { write-error "No Storage Accounts found." -ErrorAction Stop }
-
-                [string]$targetSubscriptionId = $targetSubscription.SubscriptionId
-                [string]$targetTenantId = $targetSubscription.TenantId
-                [string]$Ring1KeyVaultName = $ring1KeyVault.VaultName
-                [string]$TFStorageAccountName = $tfStorageAccount.StorageAccountName
-
-                $userName = Get-UserInputWithConfirmation "Enter the username to configure for $($targetSubscription.name)"
-            }
-            $false { $targetTenantId = (Get-AzSubscription -SubscriptionId $targetSubscriptionId).TenantId; $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccount }); }
-        }  
-
+        
+        $targetTenantId = (Get-AzSubscription -SubscriptionId $targetSubscriptionId).TenantId 
+        $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccount }) 
+    
         $cert = $null
         $subalias = "s" + $targetSubscriptionId.Substring(0, 5)
         $certificateName = "deployer.$subalias.$username".trim()
 
-        $certPath = (join-path $configPath "certs")
         $pfxPath = (join-path $certPath "$subalias.$username.pfx")
-
-        new-item -ItemType Directory -Path $certPath -force | Out-Null
 
         #TODO: add error-checking
         write-host "Generating certificate..."
@@ -248,6 +161,8 @@ Function New-EDOFUser {
             'storageacct'     = "$saURL"
             'storagekey'      = "$skURL"
         }
+        $subscriptionDirectoryName = $targetSubscription.Name -replace " ", "_"
+        new-item -type Directory -path $startPath -Name "live\$subalias" + "_$subscriptionDirectoryName" #| Out-Null
     }
     
     End {
@@ -260,5 +175,4 @@ Function New-EDOFUser {
             add-content $secretsFile "}"
         }
     }
- 
-}
+} 
