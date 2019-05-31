@@ -83,8 +83,6 @@ Function New-EDOFUser {
             import-module az.storage
         }
 
-        if (-not $Ring1KeyVaultName) { $Ring1KeyVaultName = $Ring0KeyVaultName }
-
         $startPath = (get-item $PSScriptRoot).Parent.FullName
         $configPath = (join-path $startPath "config")
         $certPath = (join-path $configPath "certs")
@@ -105,14 +103,16 @@ Function New-EDOFUser {
 
     Process {
         
-        $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId).TenantId 
-        $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccount }) 
-    
         $cert = $null
         $subalias = "s" + $TargetSubscriptionId.Substring(0, 5)
         $certificateName = "deployer.$subalias.$username".trim()
 
         $pfxPath = (join-path $certPath "$subalias.$username.pfx")
+
+        if (-not $Ring1KeyVaultName) { $Ring1KeyVaultName = $Ring0KeyVaultName }
+
+        $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId).TenantId 
+        $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccountName }) 
 
         #TODO: add error-checking
         write-host "Generating certificate..."

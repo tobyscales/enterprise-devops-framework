@@ -9,12 +9,29 @@
             },
             "defaultValue": "edof-ring1-kv"
         },
+        "keyVaultLoggingStorageAcctName": {
+            "type": "string",
+            "metadata": {
+                "description": "Specifies the name of the Storage Account for storing Ring 1 Key Vault Logs."
+            },
+            "defaultValue": "[take(toLower( replace( concat( parameters('keyVaultName'), 'logs'), '-', '') ),23)]"
+        },
+        "logsRetentionInDays": {
+            "type": "int",
+            "defaultValue": 30,
+            "minValue": 0,
+            "maxValue": 365,
+            "metadata": {
+                "description": "Specifies the number of days that logs will be kept. If you do not want to apply any retention policy and retain data forever, set value to 0."
+            }
+        },
         "TFstorageAcctName": {
             "type": "string",
             "metadata": {
                 "description": "Specifies the name of the Terraform State Files Account (Ring 1)."
             },
-            "defaultValue": "edofring1tfstate"
+            "defaultValue": "[concat('s',take(subscription().subscriptionId,5),'tfstate')]"
+            
         }
     },
     "variables": {
@@ -66,7 +83,46 @@
                     "name": "[variables('vaultSku')]",
                     "family": "A"
                 }
-            }
+            },
+            "resources": [
+                {
+                    "type": "Microsoft.KeyVault/vaults/providers/diagnosticsettings",
+                    "name": "[concat(parameters('keyVaultName'), '/Microsoft.Insights/service')]",
+                    "apiVersion": "2016-09-01",
+                    "location": "[resourceGroup().location]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+                        "[resourceId('Microsoft.Storage/storageAccounts', parameters('keyVaultLoggingStorageAcctName'))]"
+                    ],
+                    "properties": {
+                        "storageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('keyVaultLoggingStorageAcctName'))]",
+                        "logs": [
+                            {
+                                "category": "AuditEvent",
+                                "enabled": true,
+                                "retentionPolicy": {
+                                    "enabled": true,
+                                    "days": "[parameters('LogsRetentionInDays')]"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('keyVaultLoggingStorageAcctName')]",
+            "apiVersion": "2018-07-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "Storage",
+            "tags": {
+                "displayName": "concat('Key Vault ', parameters('keyVaultName'), ' diagnostics storage account')"
+            },
+            "properties": {}
         },
         {
             "type": "Microsoft.Resources/deployments",

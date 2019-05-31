@@ -12,9 +12,9 @@
         "keyVaultLoggingStorageAcctName": {
             "type": "string",
             "metadata": {
-                "description": "Specifies the name of the Ring 0 Storage Account."
+                "description": "Specifies the name of the Storage Account for storing Ring 0 Key Vault Logs."
             },
-            "defaultValue": "[take(toLower( replace( concat( parameters('keyVaultName'), 'logs' ), '-', '') ),23)]"
+            "defaultValue": "[take(toLower( replace( concat( parameters('keyVaultName'), 'logs'), '-', '') ),23)]"
         },
         "logsRetentionInDays": {
             "type": "int",
