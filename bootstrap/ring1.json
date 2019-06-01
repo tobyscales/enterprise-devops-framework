@@ -25,7 +25,7 @@
                 "description": "Specifies the number of days that logs will be kept. If you do not want to apply any retention policy and retain data forever, set value to 0."
             }
         },
-        "TFstorageAcctName": {
+        "terraformStorageAccountName": {
             "type": "string",
             "metadata": {
                 "description": "Specifies the name of the Terraform State Files Account (Ring 1)."
@@ -46,7 +46,7 @@
     "resources": [
         {
             "type": "Microsoft.Storage/storageAccounts",
-            "name": "[parameters('TFstorageAcctName')]",
+            "name": "[parameters('terraformStorageAccountName')]",
             "location": "[resourceGroup().location]",
             "apiVersion": "2018-07-01",
             "sku": {
@@ -60,7 +60,7 @@
                     "type": "blobServices/containers",
                     "apiVersion": "2018-07-01",
                     "dependsOn": [
-                        "[parameters('TFstorageAcctName')]"
+                        "[parameters('terraformStorageAccountName')]"
                     ]
                 }
             ]
@@ -130,7 +130,7 @@
             "apiVersion": "2018-05-01",
             "dependsOn": [
                 "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
-                "[resourceId('Microsoft.Storage/storageAccounts', parameters('TFstorageAcctName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('terraformStorageAccountName'))]"
             ],
             "properties": {
                 "mode": "Incremental",
@@ -143,7 +143,7 @@
                         "value": "[parameters('keyVaultName')]"
                     },
                     "diagnosticStorageAccountName": {
-                        "value": "[parameters('TFstorageAcctName')]"
+                        "value": "[parameters('terraformStorageAccountName')]"
                     }
                 }
             }

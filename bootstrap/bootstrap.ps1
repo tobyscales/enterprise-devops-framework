@@ -114,5 +114,4 @@ $EDOFargs= @{
     TFStorageAccountName = $TFStorageAccountName
 }
 
-. (join-path $scriptPath "New-EDOFUser.ps1")
-New-EDOFUser @EDOFargs
+& (join-path $scriptPath "New-EDOFUser.ps1") @EDOFargs

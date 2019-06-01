@@ -58,19 +58,19 @@ Function Set-TFData {
 Function New-EDOFUser {
     param (
         [Parameter(Mandatory = $true)]
-        [string[]]$UserName,
+        [string]$UserName,
         [Parameter(Mandatory = $true)]
-        [string[]]$Ring0KeyVaultName,
-        [string[]]$Ring1KeyVaultName,
+        [string]$Ring0KeyVaultName,
+        [string]$Ring1KeyVaultName,
         [Parameter(Mandatory = $true)]
-        [string[]]$TargetSubscriptionId,
+        [string]$TargetSubscriptionId,
         [Parameter(Mandatory = $true)]
-        [string[]]$TFStorageAccountName,
+        [string]$TFStorageAccountName,
         [switch]$SkipPrereqs
     )
     Begin {
 
-        if ($SkipPrereqs) {
+        if (-not $SkipPrereqs) {
             Set-PSRepository -Name PSGallery -InstallationPolicy Trusted 
 
             write-host "Checking Prerequisites..."
@@ -111,8 +111,14 @@ Function New-EDOFUser {
 
         if (-not $Ring1KeyVaultName) { $Ring1KeyVaultName = $Ring0KeyVaultName }
 
-        $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId).TenantId 
-        $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccountName }) 
+        try {
+            $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId -ErrorAction Stop).TenantId 
+            $tfStorageAccount = (Get-AzStorageAccount  | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccountName }) 
+        }
+        catch {
+            write-error "Unable to get Subscription $TargetSubscriptionId or Storage Account $tfStorageAccount."
+            break
+        }
 
         #TODO: add error-checking
         write-host "Generating certificate..."
@@ -197,3 +203,4 @@ Function New-EDOFUser {
         }
     }
 } 
+New-EDOFUser @args
