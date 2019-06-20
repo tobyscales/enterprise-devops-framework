@@ -72,37 +72,41 @@ $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 
 New-AzResourceGroup -Name $ring1rg -Location $ring1loc.Location
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg -AsJob
 
+$ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
+$ring1json = Get-content -raw (join-path $bootstrapPath ring1.json) | ConvertFrom-Json
 
+$ring0KeyVaultName = $ring0json.parameters.keyVaultName
+$ring1KeyVaultName = $ring1json.parameters.keyVaultName
+
+Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx.Account.Id -PermissionsToCertificates get,list,delete,create,import,update 
 #TODO: add ability to select multiple subscriptions at once?
 #TODO: add subscription creation option?
 #TODO: use pure Terraform for cert creation?
-$subs = Get-AzSubscription
-$vaults = Get-AzKeyVault
+#$subs = Get-AzSubscription
+#$vaults = Get-AzKeyVault
 $storage_accts = Get-AzStorageAccount
 
-$ring0Subscription = $ring0ctx.Subscription #Get-UserInputList $subs "Choose the Ring 0 Subscription"
+#$ring0Subscription = $ring0ctx.Subscription ##Get-UserInputList $subs "Choose the Ring 0 Subscription"
 #if (-not $ring0Subscription) { write-error "No Subscriptions found." -ErrorAction Stop }
-write-host -ForegroundColor yellow "Connecting to subscription $($ring0Subscription.name)..."
+#write-host -ForegroundColor yellow "Connecting to subscription $($ring0Subscription.name)..."
 
-set-azcontext -SubscriptionObject $ring0Subscription > $null
+#set-azcontext -SubscriptionObject $ring0Subscription > $null
 
-$ring0KeyVault = Get-UserInputList $vaults "Choose the Ring 0 Key Vault"
-if (-not $ring0KeyVault) { write-error "No Keyvaults found." -ErrorAction Stop }
+#$ring0KeyVault = Get-UserInputList $vaults "Choose the Ring 0 Key Vault"
+#if (-not $ring0KeyVault) { write-error "No Keyvaults found." -ErrorAction Stop }
 
-$targetSubscription =  $ring1ctx.Subscription #Get-UserInputList $subs "Choose the Target Subscription"
+$targetSubscription =  $ring1ctx.Subscription ##Get-UserInputList $subs "Choose the Target Subscription"
 if (-not $targetSubscription) { write-error "No Subscriptions found." -ErrorAction Stop }
 write-host -ForegroundColor yellow "Connecting to subscription $($targetSubscription.name)..."
 
-$ring1KeyVault = Get-UserInputList $vaults "Choose the Ring 1 Key Vault for $($targetSubscription.name)"
-if (-not $ring1KeyVault) { write-error "No Keyvaults found." -ErrorAction Stop }
+#$ring1KeyVault = Get-UserInputList $vaults "Choose the Ring 1 Key Vault for $($targetSubscription.name)"
+#if (-not $ring1KeyVault) { write-error "No Keyvaults found." -ErrorAction Stop }
 
 $tfStorageAccount = Get-UserInputList $storage_accts "Choose the Terraform State file Storage Account for $($targetSubscription.name)"
 if (-not $tfStorageAccount) { write-error "No Storage Accounts found." -ErrorAction Stop }
 
 $userName = Get-UserInputWithConfirmation "Enter the username to configure for $($targetSubscription.name)"
 
-[string]$Ring0KeyVaultName = $ring0KeyVault.VaultName
-[string]$Ring1KeyVaultName = $ring1KeyVault.VaultName
 [string]$targetSubscriptionId = $targetSubscription.SubscriptionId
 [string]$TFStorageAccountName = $tfStorageAccount.StorageAccountName
 
