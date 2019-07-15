@@ -5,7 +5,7 @@
         "keyVaultName": {
             "value": "edof-ring1-kv"
         },
-        "TFstorageAcctName": {
+        "terraformStorageAccountName": {
             "value": "edofring1tfstate"
         }
     }

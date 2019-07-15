@@ -52,12 +52,16 @@ import-module az.accounts
 import-module az.keyvault
 import-module az.storage
 
-#$startPath = $pwd.path
-#$rootPath = "$($startPath.Substring(0, $startPath.indexof("live")))"
 $rootPath = (get-item $PSScriptRoot).Parent.FullName
-$configPath = (join-path $rootPath "config")
-$scriptPath = (join-path $rootPath "scripts")
 $bootstrapPath = (join-path $rootPath "bootstrap")
+$configPath    = (join-path $rootPath "config")
+$certPath      = (join-path $rootPath "certs")
+$livePath      = (join-path $rootPath "live")
+$scriptPath    = (join-path $rootPath "scripts")
+
+new-item -ItemType Directory -Path $configPath -force | Out-Null
+new-item -ItemType Directory -Path $certPath -force | Out-Null
+new-item -ItemType Directory -Path $livePath -force | Out-Null
 
 #deploy Ring0 resources
 $ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription"

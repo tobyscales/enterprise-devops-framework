@@ -84,10 +84,10 @@ Function New-EDOFUser {
         }
 
         $rootPath   = (get-item $PSScriptRoot).Parent.FullName
+        $livePath   = (join-path $rootPath "live")
         $configPath = (join-path $rootPath "config")
         $certPath   = (join-path $configPath "certs")
-        $livePath   = (join-path $rootPath "live")
-        
+
         new-item -ItemType Directory -Path $configPath -force | Out-Null
         new-item -ItemType Directory -Path $certPath -force | Out-Null
         new-item -ItemType Directory -Path $livePath -force | Out-Null
@@ -115,7 +115,7 @@ Function New-EDOFUser {
 
         try {
             $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId -ErrorAction Stop).TenantId 
-            $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccountName }) 
+            $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property StorageAccountName -eq $TFStorageAccountName ) 
         }
         catch {
             write-error "Unable to get Subscription $TargetSubscriptionId or Storage Account $tfStorageAccount."
@@ -186,7 +186,7 @@ Function New-EDOFUser {
         
         write-host "Assigning to target subscription" #TODO: add RoleDefinition param
         New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$TargetSubscriptionId" | Out-Null
-        
+
         write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."
         write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass. Please store securely!!"
         $secrets += [ordered]@{
@@ -199,8 +199,8 @@ Function New-EDOFUser {
             'storageacct'     = "$saURL"
             'storagekey'      = "$skURL"
         }
-        $subscriptionDirectoryName = $targetSubscription.Name -replace " ", "_"
-        new-item -type Directory -path $startPath -Name (join-path $livePath $subalias"_"$subscriptionDirectoryName) #| Out-Null
+        $subscriptionDirectoryName = ("$subalias $($targetSubscription.Name)") -replace " ", "_"
+        new-item -type Directory -path $livePath -Name $subscriptionDirectoryName #| Out-Null
     }
     
     End {
