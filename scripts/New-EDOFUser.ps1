@@ -113,19 +113,26 @@ Function New-EDOFUser {
 
         try {
             $targetTenantId = (Get-AzSubscription -SubscriptionId $TargetSubscriptionId -ErrorAction Stop).TenantId 
-            $tfStorageAccount = (Get-AzStorageAccount  | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccountName }) 
+            $tfStorageAccount = (Get-AzStorageAccount | Where-Object -Property { $_.StorageAccountName -eq $TFStorageAccountName }) 
         }
         catch {
             write-error "Unable to get Subscription $TargetSubscriptionId or Storage Account $tfStorageAccount."
             break
         }
 
-        #TODO: add error-checking
         write-host "Generating certificate..."
         $policy = New-AzKeyVaultCertificatePolicy -SubjectName "CN=$certificateName" -IssuerName Self -ValidityInMonths 12
 
-        Add-AzKeyVaultCertificate -VaultName $Ring0KeyVaultName -Name $certificateName.replace(".", "-") -CertificatePolicy $policy | Out-Null
+        try {
+            Add-AzKeyVaultCertificate -VaultName $Ring0KeyVaultName -Name $certificateName.replace(".", "-") -CertificatePolicy $policy | Out-Null
+        }
+        catch {
+            write-error "Unable to generate Key Vault Certificate - do you have permissions to the Ring0 Key Vault?"
+            break
+        }
+
         do {
+            write-host -nonewline ..
             $cert = Get-AzKeyVaultCertificate -VaultName $Ring0KeyVaultName -Name $certificateName.replace(".", "-")
             Start-sleep -seconds 1
         } until ($cert.Certificate)
@@ -143,6 +150,8 @@ Function New-EDOFUser {
     
         write-host "Appending certificate for authentication..."
         New-AzADSpCredential -ServicePrincipalObject $mySP -CertValue $certb64 -StartDate $now -EndDate $cert.Expires | Out-Null
+
+        Set-AzKeyVaultAccessPolicy -VaultName $Ring0KeyVaultName -ObjectId $mySP.Id -PermissionsToCertificates update
 
         #from https://stackoverflow.com/questions/43837362/keyvault-generated-certificate-with-exportable-private-key and
         #https://blogs.technet.microsoft.com/kv/2016/09/26/get-started-with-azure-key-vault-certificates/ and
@@ -176,20 +185,21 @@ Function New-EDOFUser {
         
         Set-AzKeyVaultAccessPolicy -VaultName $Ring1KeyVaultName -ObjectId $mySP.Id -PermissionsToSecrets get   
         
+        
         write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."
         write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass. Please store securely!!"
         $secrets += [ordered]@{
             'subalias'        = $subalias
             'client_id'       = "$($mySP.ApplicationId)"
             'keyvault'        = $Ring1KeyVaultName
-            'keyvault_rg'     = "$($ring1KeyVault.ResourceGroupName)"
+            'keyvault_rg'     = (Get-AzKeyVault -VaultName $Ring1KeyVaultName).ResourceGroupName
             'subscription_id' = $TargetSubscriptionId
             'tenant_id'       = $targetTenantId
             'storageacct'     = "$saURL"
             'storagekey'      = "$skURL"
         }
         $subscriptionDirectoryName = $targetSubscription.Name -replace " ", "_"
-        new-item -type Directory -path $startPath -Name "live\$subalias" + "_$subscriptionDirectoryName" #| Out-Null
+        new-item -type Directory -path $startPath -Name (join-path $live $subalias"_"$subscriptionDirectoryName) #| Out-Null
     }
     
     End {

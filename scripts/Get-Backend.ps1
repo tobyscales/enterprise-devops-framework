@@ -11,9 +11,11 @@ Function Get-TFData {
         #trim the brackets off our Terraform block
         $tfblock = $tfblock -replace "(?m)$masterkey.+?{", ""
         $tfblock = $tfblock -replace "}$", ""
+        $tfblock = $tfblock -replace '"', ""
 
         return $tfblock | ConvertFrom-StringData
-    } else {
+    }
+    else {
         return $tfblock
     }
 }
@@ -82,7 +84,7 @@ function Get-KVSecret
 function Get-OauthTokenFromCertificate
 (
     [string]$clientId,
-    [string]$certPath,
+    [string]$certFile,
     [securestring]$certPass,
     [string]$audience,
     [string]$oAuthURI
@@ -92,7 +94,7 @@ function Get-OauthTokenFromCertificate
     $ptr = $marshal::SecureStringToBSTR($certPass)
     $CertFilePlainPassword = $marshal::PtrToStringBSTR($ptr)
     $marshal::ZeroFreeBSTR($ptr)
-    $Cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::New($certPath, $CertFilePlainPassword)
+    $Cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::New($certFile, $CertFilePlainPassword)
 
     $ClientCert = [Microsoft.IdentityModel.Clients.ActiveDirectory.ClientAssertionCertificate]::new($clientId, $Cert)
     $authContext = [Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext]::new($oAuthURI)
@@ -127,54 +129,49 @@ function Get-OauthTokenFromSecret {
 #endregion
 
 write-host "Checking Prerequisites..."
-#TODO: check for AzureAD module dependencies
+#TODO: remove AzureAD module dependencies??!?
+import-module az.accounts
 
 #TODO: add error-checking for $configPath
 #TOFIX: pull entire config from subscription alias
 $startPath = $pwd.path
-$configPath = "$($startPath.Substring(0, $startPath.indexof("live")))config"
+try {
+$rootPath = "$($startPath.Substring(0, $startPath.indexof("live")))" } catch { write-host -ForegroundColor yellow "Could not find \live folder. Check your path."; throw }
+
+$configPath = join-path $rootPath "config"
+$certPath   = join-path $configPath "certs"
+$scriptPath = join-path $rootPath "scripts"
+
+$backendFile = join-path $startPath "backend.tfvars"
+$globalsFile = join-path $configPath "globals.tfvars"
+$secretsFile = join-path $configPath "secrets.tfvars"
+
 $subId = [regex]::Match($startPath, 's[0-9a-fA-F]{5}') #regex match the subscription ID in the path
+if (-not $subId.Success) { write-host -ForegroundColor yellow "Could not find subscription reference in path."; throw } 
 
-if (-not $subId.Success) { write-error "Could not find subscription reference in path." } else {
-    $subId = $subId.Value
-    write-host "Initializing subscription $subId..." -ForegroundColor green
+$subId = $subId.Value
+write-host "Initializing subscription $subId..." -ForegroundColor green
 
-    $username = ((Get-Content -path "$configPath\globals.tfvars").ToLower() | Where-Object { ( (($_.StartsWith('user'))) ) }).split('=')[1].trim('"', ' ')
-    $certPath = "$configPath\certs\$subId.$username.pfx" 
+if (
+    (test-path "$globalsFile") -and
+    (test-path "$secretsFile") 
+) { 
+       
+    $username = ((Get-Content -path "$globalsFile").ToLower() | Where-Object { ( (($_.StartsWith('user'))) ) }).split('=')[1].trim('"', ' ')
+    $certFile = (join-path $certPath "$subId.$username.pfx")
+  
+    if (-not (test-path $certFile)) { throw }
 
-    #TOFIX: Cleanup cert pass
-    $certpass = ConvertTo-SecureString "hi" -AsPlainText -Force
+    $certPass = Read-Host -Prompt "Please enter a password for the certificate." -AsSecureString
+    #$certpass = ConvertTo-SecureString "" -AsPlainText -Force
+
+    $thisConfig = Get-TFData -filePath $secretsFile -masterKey $subId -asObject
     
-    $kvResourceGroups = Get-TFData "$configPath\secrets.tfvars" "keyvault_rgs" -asObject
-    $kvVaults = Get-TFData "$configPath\secrets.tfvars" "keyvaults" -asObject
-    $clientIds = Get-TFData "$configPath\secrets.tfvars" "clientids" -asObject
-    $tenantIds = Get-TFData "$configPath\secrets.tfvars" "tenantids" -asObject
-    #$clientSecrets = Get-TFData "$configPath\secrets.tfvars" "clientsecrets" -asObject
-    $backends = Get-TFData "$configPath\secrets.tfvars" "backends" -asObject
+    if (-not $thisConfig) { Write-Host -ForegroundColor red "Get-Backend.ps1: Unable to find keyvault configuration in secrets.tfvars.`n Check $configPath and try again." }
 
-    foreach ($rg in $kvResourceGroups.KEYS.GetEnumerator()) {
-        if ($rg -eq $subId) {
-            write-host "Using config at " -NoNewline
-            write-host -ForegroundColor green "$configPath\secrets.tfvars"
-            $thisConfig = [PSCustomObject]@{
-                subId        = $subId.Value
-                clientId     = $clientIds.$rg.trim('"')
-                #clientSecret = $clientSecrets.$rg.trim('"')
-                tenantId     = $tenantIds.$rg.trim('"')
-                vault        = $kvVaults.$rg.trim('"')
-                vaultrg      = $kvResourceGroups.$rg.trim('"')
-                storageacct  = $backends."$rg-storageacct".trim('"')
-                storagekey   = $backends."$rg-storagekey".trim('"')
-                username     = $username.trim('"')
-            }
-        }
-    }
-    
-    if (-not $thisConfig) { Write-Host -ForegroundColor red "Unable to find keyvault configuration in secrets.tfvars.`n Check $configPath and try again." }
+    $oauthUri = Get-Oauth2Uri $thisConfig.keyvault
 
-    $oauthUri = Get-Oauth2Uri $thisConfig.vault
-    $Token = Get-OauthTokenFromCertificate -clientId $thisConfig.clientId -certPath $certPath -certPass $certpass -audience "https://vault.azure.net" -oAuthURI $oauthUri
-    
+    $Token = Get-OauthTokenFromCertificate -clientId $thisConfig.client_id -certFile $certFile -certPass $certpass -audience "https://vault.azure.net" -oAuthURI $oauthUri    
     #TODO: add option to use client secrets instead
     #$thetoken = Get-OauthTokenFromSecret -ClientID $thisConfig.clientId -ClientSecret $thisConfig.clientSecret -TenantId $thisConfig.tenantId -ResourceName "https://vault.azure.net" 
  
@@ -184,11 +181,17 @@ if (-not $subId.Success) { write-error "Could not find subscription reference in
     switch ((Split-Path $startPath -Leaf) -match 's[0-9a-fA-F]{5}') {
         $true {
             #subscription level
-            get-childitem -directory $startpath | foreach-object { set-location $_.Name; Set-Content "backend.tfvars" -value "storage_account_name=`"$($thisConfig.storageacct)`"`ncontainer_name=`"$($thisrg)`"`naccess_key=`"$($thisConfig.storagekey)`"`nkey=`"$($thisConfig.username).terraform.tfstate`""; set-location $startPath }
+            get-childitem -directory $startpath | foreach-object { set-location $_.Name; $thisrg=(split-path $pwd.path -leaf); Set-Content "backend.tfvars" -value "storage_account_name=`"$($thisConfig.storageacct)`"`ncontainer_name=`"$thisrg`"`naccess_key=`"$($thisConfig.storagekey)`"`nkey=`"$username.terraform.tfstate`""; set-location $startPath }
         }
         $false {
             #rg level
-            Set-Content "$startPath/backend.tfvars" -value "storage_account_name=`"$($thisConfig.storageacct)`"`ncontainer_name=`"$($thisrg)`"`naccess_key=`"$($thisConfig.storagekey)`"`nkey=`"$($thisConfig.username).terraform.tfstate`""
+            $thisrg = (Split-Path $startPath -Leaf)
+            Set-Content $backendFile -value "storage_account_name=`"$($thisConfig.storageacct)`"`ncontainer_name=`"$thisrg`"`naccess_key=`"$($thisConfig.storagekey)`"`nkey=`"$username.terraform.tfstate`""
         }
     }
+}
+else {
+    # end test-path if
+    write-host -ForegroundColor DarkRed "`n `nError loading configuration for Get-Backend.ps1, check: `n$globalsFile and `n$secretsFile." 
+    throw 
 }
