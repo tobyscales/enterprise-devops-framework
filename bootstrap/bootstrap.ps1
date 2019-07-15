@@ -1,10 +1,11 @@
 #region functions
 Function Get-UserInputWithConfirmation($message) {
     $useThis = "N"
+    $userinput = ""
     while ("Y" -inotmatch $useThis) {
         clear-host
-        [string]$userinput = Read-Host $message
-        $useThis = Read-Host "$input, is that correct?"
+        $userinput = Read-Host $message
+        $useThis = Read-Host "$userinput, is that correct?"
         switch ($useThis) {
             "Y" { }
             "N" { }
@@ -58,25 +59,25 @@ $bootstrapPath = (join-path $startPath "bootstrap")
 
 #deploy Ring0 resources
 $ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription"
-Set-AzContext -Context $ring0ctx
+Set-AzContext -Context $ring0ctx[1]
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
-New-AzResourceGroup -Name $ring0rg -Location $($ring0loc.Location)
-New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg -AsJob
+New-AzResourceGroup -Name $ring0rg[1] -Location $($ring0loc.Location)
+New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg[1] -AsJob
 
 #deploy Ring1 resources
 $ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription"
-Set-AzContext $ring1ctx
+Set-AzContext -Context $ring1ctx[1]
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
-New-AzResourceGroup -Name $ring1rg -Location $($ring1loc.Location)
-New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg -AsJob
+New-AzResourceGroup -Name $ring1rg[1] -Location $($ring1loc.Location)
+New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg[1] -AsJob
 
 $ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
 $ring1json = Get-content -raw (join-path $bootstrapPath ring1.parameters.json) | ConvertFrom-Json
 
-$ring0KeyVaultName = $ring0json.parameters.keyVaultName
-$ring1KeyVaultName = $ring1json.parameters.keyVaultName
+$ring0KeyVaultName = $ring0json.parameters.keyVaultName.value
+$ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
 
 Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx.Account.Id -PermissionsToCertificates get,list,delete,create,import,update 
 #TODO: add ability to select multiple subscriptions at once?
