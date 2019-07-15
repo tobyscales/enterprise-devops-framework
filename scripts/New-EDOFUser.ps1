@@ -83,12 +83,14 @@ Function New-EDOFUser {
             import-module az.storage
         }
 
-        $startPath = (get-item $PSScriptRoot).Parent.FullName
-        $configPath = (join-path $startPath "config")
-        $certPath = (join-path $configPath "certs")
+        $rootPath   = (get-item $PSScriptRoot).Parent.FullName
+        $configPath = (join-path $rootPath "config")
+        $certPath   = (join-path $configPath "certs")
+        $livePath   = (join-path $rootPath "live")
         
         new-item -ItemType Directory -Path $configPath -force | Out-Null
         new-item -ItemType Directory -Path $certPath -force | Out-Null
+        new-item -ItemType Directory -Path $livePath -force | Out-Null
 
         $secrets = @()
 
@@ -173,9 +175,6 @@ Function New-EDOFUser {
 
         write-host "User deployer.$subalias.$username successfully created, credentials stored in $($ring0KeyVaultName)."
 
-        write-host "Assigning to target subscription" #TODO: add RoleDefinition param
-        New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$TargetSubscriptionId" | Out-Null
-
         $key1 = (Get-AzStorageAccountKey -ResourceGroupName $tfStorageAccount.ResourceGroupName -Name $tfStorageAccount.StorageAccountName).Value[0]
 
         #add error-checking to ensure secrets are actually stored
@@ -183,8 +182,10 @@ Function New-EDOFUser {
         $saURL = (Set-AzKeyVaultSecret -VaultName $Ring1KeyVaultName -name "$subalias-storageacct" -SecretValue (convertto-securestring $TFStorageAccount.StorageAccountName -AsPlainText -Force)).Id
         $skURL = (Set-AzKeyVaultSecret -VaultName $Ring1KeyVaultName -name "$subalias-storagekey" -SecretValue (convertto-securestring $key1 -AsPlainText -Force)).Id
         
-        Set-AzKeyVaultAccessPolicy -VaultName $Ring1KeyVaultName -ObjectId $mySP.Id -PermissionsToSecrets get   
+        Set-AzKeyVaultAccessPolicy -VaultName $Ring1KeyVaultName -ObjectId $mySP.Id -PermissionsToSecrets get
         
+        write-host "Assigning to target subscription" #TODO: add RoleDefinition param
+        New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$TargetSubscriptionId" | Out-Null
         
         write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."
         write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass. Please store securely!!"
@@ -199,7 +200,7 @@ Function New-EDOFUser {
             'storagekey'      = "$skURL"
         }
         $subscriptionDirectoryName = $targetSubscription.Name -replace " ", "_"
-        new-item -type Directory -path $startPath -Name (join-path $live $subalias"_"$subscriptionDirectoryName) #| Out-Null
+        new-item -type Directory -path $startPath -Name (join-path $livePath $subalias"_"$subscriptionDirectoryName) #| Out-Null
     }
     
     End {

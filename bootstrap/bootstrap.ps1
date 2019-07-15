@@ -52,9 +52,9 @@ import-module az.accounts
 import-module az.keyvault
 import-module az.storage
 
-$startPath = $pwd.path
-$rootPath = "$($startPath.Substring(0, $startPath.indexof("live")))"
-#$startPath = (get-item $PSScriptRoot).Parent.FullName
+#$startPath = $pwd.path
+#$rootPath = "$($startPath.Substring(0, $startPath.indexof("live")))"
+$rootPath = (get-item $PSScriptRoot).Parent.FullName
 $configPath = (join-path $rootPath "config")
 $scriptPath = (join-path $rootPath "scripts")
 $bootstrapPath = (join-path $rootPath "bootstrap")
@@ -66,7 +66,7 @@ Set-AzContext -Context $ring0ctx[-1]
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
 New-AzResourceGroup -Name $ring0rg[-1] -Location $($ring0loc[-1].Location)
-New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg[1] -AsJob
+New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg[-1] #-AsJob
 
 #deploy Ring1 resources
 $ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription"
@@ -81,7 +81,7 @@ $storage_accts = Get-AzStorageAccount | sort-object -Property ResourceGroupName
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
 New-AzResourceGroup -Name $ring1rg[-1] -Location $($ring1loc[-1].Location)
-New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg[1] -AsJob
+New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg[-1] #-AsJob
 
 $ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
 $ring1json = Get-content -raw (join-path $bootstrapPath ring1.parameters.json) | ConvertFrom-Json
@@ -89,7 +89,7 @@ $ring1json = Get-content -raw (join-path $bootstrapPath ring1.parameters.json) |
 $ring0KeyVaultName = $ring0json.parameters.keyVaultName.value
 $ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
 
-Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx[-1].Account.Id -PermissionsToCertificates get,list,delete,create,import,update 
+Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
 
 #TODO: add ability to select multiple subscriptions at once?
 #TODO: add subscription creation option?
@@ -104,7 +104,7 @@ $targetSubscriptionId = $ring1Subscription.SubscriptionId
 $TFStorageAccountName = $tfStorageAccount[-1].StorageAccountName
 
 $EDOFargs= @{
-    Username = $userName
+    Username = $userName[-1]
     Ring0KeyVaultName = $ring0KeyVaultName
     Ring1KeyVaultName = $Ring1KeyVaultName
     targetSubscriptionId = $targetSubscriptionId
