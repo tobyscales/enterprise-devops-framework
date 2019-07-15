@@ -163,8 +163,8 @@ Function New-EDOFUser {
 
         #create Temporary Random Password for certificate
         $PasswordLength = 10
-        $ascii = 33..126 | % { [char][byte]$_ }
-        $certpass = $(0..$passwordLength | % { $ascii | get-random }) -join ""
+        $ascii = 33..126 | ForEach-Object { [char][byte]$_ }
+        $certpass = $(0..$passwordLength | ForEach-Object { $ascii | get-random }) -join ""
 
         $pfxSecret = Get-AzKeyVaultSecret -VaultName $Ring0KeyVaultName -Name $certificateName.replace(".", "-") -Version $cert.Version
         $pfxUnprotectedBytes = [Convert]::FromBase64String($pfxSecret.SecretValueText)
@@ -176,6 +176,7 @@ Function New-EDOFUser {
         write-host "User deployer.$subalias.$username successfully created, credentials stored in $($ring0KeyVaultName)."
 
         $key1 = (Get-AzStorageAccountKey -ResourceGroupName $tfStorageAccount.ResourceGroupName -Name $tfStorageAccount.StorageAccountName).Value[0]
+        $targetSubscription = Get-AzSubscription -SubscriptionId $TargetSubscriptionId
 
         #add error-checking to ensure secrets are actually stored
         write-host "Storing Ring 1 secrets in $Ring1KeyVaultName..."
@@ -185,6 +186,7 @@ Function New-EDOFUser {
         Set-AzKeyVaultAccessPolicy -VaultName $Ring1KeyVaultName -ObjectId $mySP.Id -PermissionsToSecrets get
         
         write-host "Assigning to target subscription" #TODO: add RoleDefinition param
+        ## TODO: perform pre-flight check to make sure hte SP exists... hopefully enough time has passed by now!
         New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$TargetSubscriptionId" | Out-Null
 
         write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."

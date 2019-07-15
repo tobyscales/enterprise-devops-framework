@@ -125,3 +125,8 @@ This approach delivers solid MFA for developer machines without being a nuisance
  * Add certificate auto-renewal
  * Add ACME support for LetsEncrypt-signed certs
  * Initialize- script with automated subscription/ring1 resource and access creation
+ * Add Azure Blueprint for creating the whole mess at once
+
+## TODO LATER:
+* Add subscription creation option in bootstrap.ps1?
+* Use pure Terraform for cert creation in New-EDOF.ps1?
