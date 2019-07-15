@@ -73,7 +73,7 @@ New-AzResourceGroup -Name $ring1rg -Location $ring1loc.Location
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg -AsJob
 
 $ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
-$ring1json = Get-content -raw (join-path $bootstrapPath ring1.json) | ConvertFrom-Json
+$ring1json = Get-content -raw (join-path $bootstrapPath ring1.parameters.json) | ConvertFrom-Json
 
 $ring0KeyVaultName = $ring0json.parameters.keyVaultName
 $ring1KeyVaultName = $ring1json.parameters.keyVaultName
