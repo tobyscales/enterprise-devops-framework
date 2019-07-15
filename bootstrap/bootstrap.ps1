@@ -3,7 +3,7 @@ Function Get-UserInputWithConfirmation($message) {
     $useThis = "N"
     while ("Y" -inotmatch $useThis) {
         clear-host
-        $input = Read-Host $message
+        [string]$userinput = Read-Host $message
         $useThis = Read-Host "$input, is that correct?"
         switch ($useThis) {
             "Y" { }
@@ -11,7 +11,7 @@ Function Get-UserInputWithConfirmation($message) {
             default { $useThis = Read-Host "Please enter Y or N" }
         }
     }
-    return $input
+    return $userinput
 }
 Function Get-UserInputList { 
     param (
@@ -61,7 +61,7 @@ $ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select yo
 Set-AzContext -Context $ring0ctx
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
-New-AzResourceGroup -Name "$ring0rg" -Location $($ring0loc.Location)
+New-AzResourceGroup -Name $ring0rg -Location $($ring0loc.Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg -AsJob
 
 #deploy Ring1 resources
@@ -69,7 +69,7 @@ $ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select yo
 Set-AzContext $ring1ctx
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
-New-AzResourceGroup -Name "$ring1rg" -Location $($ring1loc.Location)
+New-AzResourceGroup -Name $ring1rg -Location $($ring1loc.Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg -AsJob
 
 $ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
