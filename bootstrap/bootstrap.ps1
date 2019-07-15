@@ -60,6 +60,12 @@ new-item -ItemType Directory -Path $configPath -force | Out-Null
 new-item -ItemType Directory -Path $certPath -force | Out-Null
 new-item -ItemType Directory -Path $livePath -force | Out-Null
 
+$ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
+$ring1json = Get-content -raw (join-path $bootstrapPath ring1.parameters.json) | ConvertFrom-Json
+
+$ring0KeyVaultName = $ring0json.parameters.keyVaultName.value
+$ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
+
 #deploy Ring0 resources
 $ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription"
 Set-AzContext -Context $ring0ctx[-1]
@@ -68,6 +74,8 @@ $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region 
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
 New-AzResourceGroup -Name $ring0rg[-1] -Location $($ring0loc[-1].Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg[-1] #-AsJob
+
+Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
 
 #deploy Ring1 resources
 $ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription"
@@ -83,16 +91,9 @@ $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 
 New-AzResourceGroup -Name $ring1rg[-1] -Location $($ring1loc[-1].Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg[-1] #-AsJob
 
-$storage_accts = Get-AzStorageAccount | sort-object -Property ResourceGroupName
-
-$ring0json = Get-content -raw (join-path $bootstrapPath ring0.parameters.json) | ConvertFrom-Json
-$ring1json = Get-content -raw (join-path $bootstrapPath ring1.parameters.json) | ConvertFrom-Json
-
-$ring0KeyVaultName = $ring0json.parameters.keyVaultName.value
-$ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
-
-Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
 Set-AzKeyVaultAccessPolicy -VaultName $ring1KeyVaultName -UserPrincipalName $ring1ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToSecrets create,list,update,delete
+
+$storage_accts = Get-AzStorageAccount | sort-object -Property ResourceGroupName
 
 ## This code logic could also be moved to the New-EDOFUser script with a -Interactive switch...
 # choose Subscription to Manage
