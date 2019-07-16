@@ -111,6 +111,7 @@ Function New-EDOFUser {
 
         $pfxPath = (join-path $certPath "$subalias.$username.pfx")
 
+        # set defaults
         if (-not $Ring1KeyVaultName) { $Ring1KeyVaultName = $Ring0KeyVaultName }
 
         try {
@@ -122,6 +123,7 @@ Function New-EDOFUser {
             break
         }
 
+        # do Ring0 stuff
         write-host "Generating certificate..."
         $policy = New-AzKeyVaultCertificatePolicy -SubjectName "CN=$certificateName" -IssuerName Self -ValidityInMonths 12
 
@@ -130,7 +132,7 @@ Function New-EDOFUser {
         }
         catch {
             write-error "Unable to generate Key Vault Certificate - do you have permissions to the Ring0 Key Vault?"
-            break
+            exit
         }
 
         do {
@@ -142,18 +144,29 @@ Function New-EDOFUser {
         $now = [System.DateTime]::Now
         $certb64 = [System.Convert]::ToBase64String($cert.Certificate.RawData)
 
-        #TODO: add error-checking/catching code
-        $mySP = Get-AzADServicePrincipal -DisplayName "deployer.$subalias.$username" 
+        write-host "Finding Service Principal"
 
-        if (-not $mySP) {
-            #TODO: add SP to Management Group option instead of direct assignment
-            $mySP = New-AzADServicePrincipal -DisplayName "deployer.$subalias.$username" -ErrorAction Stop 
-        }
-    
+        do {
+            write-host -nonewline ..
+
+            #TODO: add error-checking/catching code
+            $mySP = Get-AzADServicePrincipal -DisplayName "deployer.$subalias.$username" 
+
+            if (-not $mySP) {
+                #TODO: add SP to Management Group option instead of direct assignment
+                write-host "Creating Service Principal in $((get-azcontext).Tenant)"
+                $mySP = New-AzADServicePrincipal -DisplayName "deployer.$subalias.$username" -ErrorAction Stop 
+            }
+
+            Start-sleep -seconds 1
+
+        } until ($mySP.Id)
+
         write-host "Appending certificate for authentication..."
         New-AzADSpCredential -ServicePrincipalObject $mySP -CertValue $certb64 -StartDate $now -EndDate $cert.Expires | Out-Null
 
         Set-AzKeyVaultAccessPolicy -VaultName $Ring0KeyVaultName -ObjectId $mySP.Id -PermissionsToCertificates update
+        Set-AzKeyVaultAccessPolicy -VaultName $Ring1KeyVaultName -ObjectId $mySP.Id -PermissionsToSecrets get
 
         #from https://stackoverflow.com/questions/43837362/keyvault-generated-certificate-with-exportable-private-key and
         #https://blogs.technet.microsoft.com/kv/2016/09/26/get-started-with-azure-key-vault-certificates/ and
@@ -175,22 +188,23 @@ Function New-EDOFUser {
 
         write-host "User deployer.$subalias.$username successfully created, credentials stored in $($ring0KeyVaultName)."
 
-        $key1 = (Get-AzStorageAccountKey -ResourceGroupName $tfStorageAccount.ResourceGroupName -Name $tfStorageAccount.StorageAccountName).Value[0]
+        # switch context to Ring1
         $targetSubscription = Get-AzSubscription -SubscriptionId $TargetSubscriptionId
+        Select-AzSubscription -Subscription $TargetSubscriptionId
 
-        #add error-checking to ensure secrets are actually stored
+        #TODO: add error-checking to ensure we get the storage acct key
+        $key1 = (Get-AzStorageAccountKey -ResourceGroupName $tfStorageAccount.ResourceGroupName -Name $tfStorageAccount.StorageAccountName).Value[0]
+
+        #TODO: add error-checking to ensure secrets are actually stored
         write-host "Storing Ring 1 secrets in $Ring1KeyVaultName..."
         $saURL = (Set-AzKeyVaultSecret -VaultName $Ring1KeyVaultName -name "$subalias-storageacct" -SecretValue (convertto-securestring $TFStorageAccount.StorageAccountName -AsPlainText -Force)).Id
         $skURL = (Set-AzKeyVaultSecret -VaultName $Ring1KeyVaultName -name "$subalias-storagekey" -SecretValue (convertto-securestring $key1 -AsPlainText -Force)).Id
         
-        Set-AzKeyVaultAccessPolicy -VaultName $Ring1KeyVaultName -ObjectId $mySP.Id -PermissionsToSecrets get
-        
         write-host "Assigning to target subscription" #TODO: add RoleDefinition param
-        ## TODO: perform pre-flight check to make sure hte SP exists... hopefully enough time has passed by now!
+
+        ## TODO: perform pre-flight check to make sure the SP exists... hopefully enough time has passed by now!
         New-AzRoleAssignment -ApplicationId $mySP.applicationId -RoleDefinitionName Contributor -scope "/subscriptions/$TargetSubscriptionId" | Out-Null
 
-        write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."
-        write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass. Please store securely!!"
         $secrets += [ordered]@{
             'subalias'        = $subalias
             'client_id'       = "$($mySP.ApplicationId)"
@@ -201,8 +215,13 @@ Function New-EDOFUser {
             'storageacct'     = "$saURL"
             'storagekey'      = "$skURL"
         }
+
         $subscriptionDirectoryName = ("$subalias $($targetSubscription.Name)") -replace " ", "_"
         new-item -type Directory -path $livePath -Name $subscriptionDirectoryName #| Out-Null
+
+        #TODO: Add file output option for bulk-adding users
+        write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."
+        write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass. Please store securely!!"
     }
     
     End {

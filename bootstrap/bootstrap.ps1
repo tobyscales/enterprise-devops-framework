@@ -11,6 +11,7 @@ Function Get-UserInputWithConfirmation($message) {
             "N" { }
             default { $useThis = Read-Host "Please enter Y or N" }
         }
+
     }
     return $userinput
 }
@@ -29,11 +30,11 @@ Function Get-UserInputList {
     do {
         clear-host
         $i = 1
-        $objects | ForEach-Object { $_ | Add-Member -NotePropertyName Choice -NotePropertyValue $i -Force -PassThru; $i++ } | select Choice, *Name | Out-Host
-        $i = read-host -prompt $message
-        $selected_object = $objects[$i - 1]
+        $objects | ForEach-Object { $_ | Add-Member -NotePropertyName Choice -NotePropertyValue $i -Force -PassThru; $i++ } | Select Choice, *Name | Out-Host
+        $userinput = read-host -prompt $message
+        if ( $userinput ) { $selected_object = $objects[$userinput - 1] } else { $userinput = read-host -prompt "Please enter a number" }
 
-    } until ($selected_object)
+    } until ($userinput)
     return $selected_object
 }
 #endregion functions
@@ -72,8 +73,9 @@ Set-AzContext -Context $ring0ctx[-1]
 
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
-New-AzResourceGroup -Name $ring0rg[-1] -Location $($ring0loc[-1].Location)
-New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg[-1] #-AsJob
+
+New-AzResourceGroup -Name $ring0rg -Location $($ring0loc[-1].Location)
+New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg #-AsJob
 
 Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
 
@@ -88,8 +90,8 @@ Set-AzContext -Context $ring1ctx[-1]
 
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
-New-AzResourceGroup -Name $ring1rg[-1] -Location $($ring1loc[-1].Location)
-New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg[-1] #-AsJob
+New-AzResourceGroup -Name $ring1rg -Location $($ring1loc[-1].Location)
+New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg #-AsJob
 
 Set-AzKeyVaultAccessPolicy -VaultName $ring1KeyVaultName -UserPrincipalName $ring1ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToSecrets create,list,update,delete
 
@@ -115,5 +117,5 @@ $EDOFargs= @{
     targetSubscriptionId = $targetSubscriptionId
     TFStorageAccountName = $TFStorageAccountName
 }
-
+Set-AzContext -Context $ring0ctx[-1]
 & (join-path $scriptPath "New-EDOFUser.ps1") @EDOFargs
