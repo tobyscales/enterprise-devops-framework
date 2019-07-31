@@ -19,23 +19,26 @@ Function Get-UserInputList {
     param (
         [Parameter(Mandatory,
             Position = 0)]
-        [System.Object[]]$objects, 
+        $objects, 
 
         [Parameter(Mandatory,
             Position = 1)]
         [string[]]$message)
 
     if ($objects.count -lt 1) { Write-Error "None found." -ErrorAction Stop; return $false }
-
+    clear-host
+    
     do {
-        clear-host
         $i = 1
         $objects | ForEach-Object { $_ | Add-Member -NotePropertyName Choice -NotePropertyValue $i -Force -PassThru; $i++ } | Select Choice, *Name | Out-Host
-        $userinput = read-host -prompt $message
-        if ( $userinput ) { $selected_object = $objects[$userinput - 1] } else { $userinput = read-host -prompt "Please enter a number" }
+        [int]$userinput = read-host -prompt $message
+        if ($userinput -notmatch '\d+' ) { $userinput = read-host -prompt "Please enter a number" }
 
-    } until ($userinput)
-    return $selected_object
+    } until (($userinput -match '\d+') -and ($userinput -lt ($i+1)))
+
+    $selected_object = $objects[$userinput - 1] 
+    
+    return ($selected_object)
 }
 #endregion functions
 
@@ -69,27 +72,36 @@ $ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
 
 #deploy Ring0 resources
 $ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription"
-Set-AzContext -Context $ring0ctx[-1]
+if ($isLinux) { $ring0ctx = $ring0ctx[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
+Set-AzContext -Context $ring0ctx
 
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
-$ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
+if ($isLinux) { $ring0loc = $ring0loc[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
 
-New-AzResourceGroup -Name $ring0rg -Location $($ring0loc[-1].Location)
+$ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
+if ($isLinux) { $ring0rg = $ring0rg[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
+
+New-AzResourceGroup -Name $ring0rg -Location $($ring0loc.Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg #-AsJob
 
-Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
+Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx.Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
 
 #deploy Ring1 resources
 $ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription"
+if ($isLinux) { $ring1ctx = $ring1ctx[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
 
-$ring1Subscription = $ring1ctx[-1].Subscription 
+$ring1Subscription = $ring1ctx.Subscription 
 if (-not $ring1Subscription) { write-error "No Subscriptions found." -ErrorAction Stop }
 write-host -ForegroundColor yellow "Connecting to subscription $($ring1Subscription.name)..."
 
-Set-AzContext -Context $ring1ctx[-1]
+Set-AzContext -Context $ring1ctx
 
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
+if ($isLinux) { $ring1loc = $ring1loc[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
+
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
+if ($isLinux) { $ring1rg = $ring1rg[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
+
 New-AzResourceGroup -Name $ring1rg -Location $($ring1loc[-1].Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg #-AsJob
 
