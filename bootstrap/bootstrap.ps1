@@ -3,7 +3,7 @@ Function Get-UserInputWithConfirmation($message) {
     $useThis = "N"
     $userinput = ""
     while ("Y" -inotmatch $useThis) {
-        clear-host
+        $null = clear-host #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
         $userinput = Read-Host $message
         $useThis = Read-Host "$userinput, is that correct?"
         switch ($useThis) {
@@ -26,7 +26,7 @@ Function Get-UserInputList {
         [string[]]$message)
 
     if ($objects.count -lt 1) { Write-Error "None found." -ErrorAction Stop; return $false }
-    clear-host
+    $null = clear-host #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
     
     do {
         $i = 1
@@ -72,14 +72,10 @@ $ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
 
 #deploy Ring0 resources
 $ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription"
-if ($isLinux) { $ring0ctx = $ring0ctx[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
 Set-AzContext -Context $ring0ctx
 
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
-if ($isLinux) { $ring0loc = $ring0loc[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
-
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
-if ($isLinux) { $ring0rg = $ring0rg[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
 
 New-AzResourceGroup -Name $ring0rg -Location $($ring0loc.Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg #-AsJob
@@ -88,24 +84,18 @@ Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $rin
 
 #deploy Ring1 resources
 $ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription"
-if ($isLinux) { $ring1ctx = $ring1ctx[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
-
 $ring1Subscription = $ring1ctx.Subscription 
 if (-not $ring1Subscription) { write-error "No Subscriptions found." -ErrorAction Stop }
 write-host -ForegroundColor yellow "Connecting to subscription $($ring1Subscription.name)..."
-
 Set-AzContext -Context $ring1ctx
 
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
-if ($isLinux) { $ring1loc = $ring1loc[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
-
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
-if ($isLinux) { $ring1rg = $ring1rg[-1] } #terrible bug in PS Clear-Host: https://github.com/PowerShell/PowerShell/issues/10181
 
 New-AzResourceGroup -Name $ring1rg -Location $($ring1loc[-1].Location)
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg #-AsJob
 
-Set-AzKeyVaultAccessPolicy -VaultName $ring1KeyVaultName -UserPrincipalName $ring1ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToSecrets create,list,update,delete
+Set-AzKeyVaultAccessPolicy -VaultName $ring1KeyVaultName -UserPrincipalName $ring1ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToCertificates create,list,update,delete
 
 $storage_accts = Get-AzStorageAccount | sort-object -Property ResourceGroupName
 
