@@ -119,6 +119,7 @@ This approach delivers solid MFA for developer machines without being a nuisance
 
 ## TODO:
  * Move Get-Backend logic into an Azure Function so the whole shebang can be run with shell/batch scripts and not require PSCore installed on Dev PCs.
+ * Add cross-AAD tenant support
  * Add support for deploying ARM templates
  * Add support for user access other than Contributor
  * Add support for Management Groups instead of direct assignment

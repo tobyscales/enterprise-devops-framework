@@ -221,7 +221,7 @@ Function New-EDOFUser {
 
         #TODO: Add file output option for bulk-adding users
         write-host "Successfully configured deployer.$subalias.$username to deploy to $($targetSubscription.Name) and store Terraform state in $($TFStorageAccount.StorageAccountName)."
-        write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass. Please store securely!!"
+        write-host -ForegroundColor Green "Password for $subalias.$username.pfx is: $certpass `nPlease store securely!!"
     }
     
     End {

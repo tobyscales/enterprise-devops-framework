@@ -56,7 +56,7 @@ import-module az.storage
 $rootPath = (get-item $PSScriptRoot).Parent.FullName
 $bootstrapPath = (join-path $rootPath "bootstrap")
 $configPath    = (join-path $rootPath "config")
-$certPath      = (join-path $rootPath "certs")
+$certPath      = (join-path $configPath "certs")
 $livePath      = (join-path $rootPath "live")
 $scriptPath    = (join-path $rootPath "scripts")
 
@@ -71,19 +71,20 @@ $ring0KeyVaultName = $ring0json.parameters.keyVaultName.value
 $ring1KeyVaultName = $ring1json.parameters.keyVaultName.value
 
 #deploy Ring0 resources
-$ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription"
+$ring0ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 0 Subscription `nNOTE: Must use the same AAD tenant as your current Account"
 Set-AzContext -Context $ring0ctx
 
 $ring0loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring0 Resources"
 $ring0rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 0 resource group"
 
-New-AzResourceGroup -Name $ring0rg -Location $($ring0loc.Location)
+New-AzResourceGroup -Name $ring0rg -Location $($ring0loc.Location) | out-null
+write-host -ForegroundColor yellow "Deploying to $ring0rg..."
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring0.json) -TemplateParameterFile (join-path $bootstrapPath ring0.parameters.json) -ResourceGroupName $ring0rg #-AsJob
 
 Set-AzKeyVaultAccessPolicy -VaultName $ring0KeyVaultName -UserPrincipalName $ring0ctx.Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToKeys get,list,update,create,import,delete -PermissionsToCertificates get,list,update,create,import,delete
 
 #deploy Ring1 resources
-$ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription"
+$ring1ctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select your Ring 1 Subscription `nNOTE: Must use the same AAD tenant as your current Account"
 $ring1Subscription = $ring1ctx.Subscription 
 if (-not $ring1Subscription) { write-error "No Subscriptions found." -ErrorAction Stop }
 write-host -ForegroundColor yellow "Connecting to subscription $($ring1Subscription.name)..."
@@ -92,17 +93,18 @@ Set-AzContext -Context $ring1ctx
 $ring1loc = Get-UserInputList (Get-AzLocation) -message "Select an Azure Region to deploy Ring1 Resources"
 $ring1rg = Get-UserInputWithConfirmation -message "Enter a name for your Ring 1 resource group"
 
-New-AzResourceGroup -Name $ring1rg -Location $($ring1loc[-1].Location)
+New-AzResourceGroup -Name $ring1rg -Location $($ring1loc.Location) | out-null
+write-host -ForegroundColor yellow "Deploying to $ring1rg..."
 New-AzResourceGroupDeployment -TemplateFile (join-path $bootstrapPath ring1.json) -TemplateParameterFile (join-path $bootstrapPath ring1.parameters.json) -ResourceGroupName $ring1rg #-AsJob
 
-Set-AzKeyVaultAccessPolicy -VaultName $ring1KeyVaultName -UserPrincipalName $ring1ctx[-1].Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToCertificates create,list,update,delete
+Set-AzKeyVaultAccessPolicy -VaultName $ring1KeyVaultName -UserPrincipalName $ring1ctx.Account.Id -PermissionsToSecrets get,list,set,delete -PermissionsToCertificates create,list,update,delete
 
 $storage_accts = Get-AzStorageAccount | sort-object -Property ResourceGroupName
 
 ## This code logic could also be moved to the New-EDOFUser script with a -Interactive switch...
 # choose Subscription to Manage
-$targetSubscriptionctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select the Subscription to be managed by Azure DevOps Framework."
-$targetSubscription=$targetSubscriptionctx[-1].Subscription
+$targetSubscriptionctx = Get-UserInputList (Get-AzContext -ListAvailable) -message "Select the Subscription to be managed by Azure Enterprise DevOps Framework."
+$targetSubscription=$targetSubscriptionctx.Subscription
 
 $tfStorageAccount = Get-UserInputList $storage_accts "Choose the Terraform State file Storage Account for $($targetSubscription.name)"
 if (-not $tfStorageAccount) { write-error "No Storage Accounts found." -ErrorAction Stop }
@@ -110,7 +112,7 @@ if (-not $tfStorageAccount) { write-error "No Storage Accounts found." -ErrorAct
 $userName = Get-UserInputWithConfirmation "Enter the first username to configure with deployment rights to $($targetSubscription.name)"
 
 $targetSubscriptionId = $targetSubscription.SubscriptionId
-$TFStorageAccountName = $tfStorageAccount[-1].StorageAccountName
+$TFStorageAccountName = $tfStorageAccount.StorageAccountName
 
 $EDOFargs= @{
     Username = $userName
@@ -119,5 +121,5 @@ $EDOFargs= @{
     targetSubscriptionId = $targetSubscriptionId
     TFStorageAccountName = $TFStorageAccountName
 }
-Set-AzContext -Context $ring0ctx[-1]
+Set-AzContext -Context $ring0ctx
 & (join-path $scriptPath "New-EDOFUser.ps1") @EDOFargs
