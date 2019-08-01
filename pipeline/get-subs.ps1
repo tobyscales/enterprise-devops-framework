@@ -1,6 +1,6 @@
 
 $url = "$env:SYSTEM_TEAMFOUNDATIONCOLLECTIONURI$env:SYSTEM_TEAMPROJECT/_apis/git/repositories/$env:BUILD_REPOSITORY_ID/commits/$env:BUILD_SOURCEVERSION/changes?api-version=5.0"
-
+write-host $url
 $currentCommits = Invoke-RestMethod -Uri $url -Headers @{ Authorization = "Bearer $env:THE_TOKEN" };
 $subs = @();
 $i = 0;
