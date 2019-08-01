@@ -1,10 +1,13 @@
 @echo off
 
 set in_dir=%cd%
+set script_dir=%~dp0
 set root_dir=%~dp0..\
 set _psrun=0
 set _psinit=0
 set tfargs=
+set errorlevel=
+
 REM TODO: IF NOT EXIST secrets.tfvars RUN INITIALIZE_DEVPC
 
 for %%a in (.) do set currentfolder=%%~nxa
@@ -14,7 +17,6 @@ rem Fix this to allow for running in rg folders
 :: echo %subid%|findstr /R /C:"\<[s][0123-9aAb-Cd-EfF][0123-9aAb-Cd-EfF][0123-9aAb-Cd-EfF][0123-9aAb-Cd-EfF][0123-9aAb-Cd-EfF]*" >nul
 :: if %errorlevel% NEQ 0 goto err_path
 
-
 if /i "%1"=="" goto help
 if /i "%1"=="init" set _psinit=1
 
@@ -23,14 +25,14 @@ if /i "%1"=="apply" set _psrun=1
 if /i "%1"=="destroy" set _psrun=1
 
 if "%_psinit%"=="1" (
-    pwsh -NoProfile -NoLogo -NonInteractive -ExecutionPolicy Bypass -file "%root_dir%scripts\get-backend.ps1"
-    if errorlevel == 1 goto cleanup
+    pwsh -NoProfile -NoLogo -ExecutionPolicy Bypass -file "%script_dir%\get-backend.ps1"
+    if %errorlevel% NEQ 0 goto cleanup
     set tfargs=-backend-config=^"backend.tfvars^"
 )
 
 if "%_psrun%"=="1" (
-    pwsh -NoProfile -ExecutionPolicy Bypass -file "%root_dir%scripts\get-config.ps1" 
-    if errorlevel == 1 goto cleanup
+    pwsh -NoProfile -NoLogo -NonInteractive -ExecutionPolicy Bypass -file "%script_dir%\get-config.ps1" 
+    if %errorlevel% NEQ 0 goto cleanup
 )
 
 rem .terraform directory exclusion code cribbed from https://stackoverflow.com/posts/25539569/revisions
@@ -41,6 +43,7 @@ for /R "%in_dir%" %%G in (.) DO (
         pushd %%G
         if "%%G"=="%in_dir%\." ( 
             echo >nul 
+            terraform %* %tfargs%
         ) else (
             terraform %* %tfargs%
             popd 
@@ -49,6 +52,7 @@ for /R "%in_dir%" %%G in (.) DO (
 )
 
 goto :cleanup
+
 
 :help
 terraform /? 2>nul

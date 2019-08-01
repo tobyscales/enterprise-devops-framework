@@ -135,8 +135,8 @@ import-module az.accounts
 #TODO: add error-checking for $configPath
 #TOFIX: pull entire config from subscription alias
 $startPath = $pwd.path
-try {
-$rootPath = "$($startPath.Substring(0, $startPath.indexof("live")))" } catch { write-host -ForegroundColor yellow "Could not find \live folder. Check your path."; throw }
+$rootPath = (get-item $PSScriptRoot).Parent.FullName
+
 
 $configPath = join-path $rootPath "config"
 $certPath   = join-path $configPath "certs"

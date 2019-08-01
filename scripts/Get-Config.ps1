@@ -18,12 +18,15 @@ Function Get-TFData {
 }
 
 #TODO: add error-checking for $configPath
-#TOFIX: copy certificates based on username
-$startPath = $pwd.path
-$rootPath = "$($startPath.Substring(0, $startPath.indexof("live")))"
 
-$configPath = join-path $rootPath "config"
-$scriptPath = join-path $rootPath "scripts"
+$startPath = $pwd.path
+$rootPath = (get-item $PSScriptRoot).Parent.FullName
+$bootstrapPath = (join-path $rootPath "bootstrap")
+$configPath    = (join-path $rootPath "config")
+$certPath      = (join-path $configPath "certs")
+$livePath      = (join-path $rootPath "live")
+$scriptPath    = (join-path $rootPath "scripts")
+
 $globalsFile = join-path $configPath "globals.tfvars"
 $providerFile = join-path $configPath "provider.tf"
 $secretsFile = join-path $configPath "secrets.tfvars"
@@ -53,7 +56,7 @@ if (
             copy-item "$configPath/globals.tfvars" "$startPath/secrets.auto.tfvars" -Force
             #copy-item "$configPath/secrets.tfvars" "$startPath/secrets.auto.tfvars" -Force
             copy-item "$configPath/provider.tf" "$startPath/provider.tf" -Force
-            copy-item "$configPath/certs/$subId.$username.pfx" "$startPath/$subId.$username.pfx" -Force
+            copy-item "$certPath/$subId.$username.pfx" "$startPath/$subId.$username.pfx" -Force
 
             ## SUPER IMPORTANT NOTE: /config/secrets.tfvars should never be checked into your code repo!
             $thisconfig = (Get-TFData "$configPath/secrets.tfvars" -masterKey $subId) -replace "(?smi)$subid.+?{", "this-config = {"
