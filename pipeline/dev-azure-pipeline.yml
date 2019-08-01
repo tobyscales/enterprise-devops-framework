@@ -50,7 +50,7 @@ jobs:
     steps:
     # This job sets foundSubs to true if it finds changes in the /live folder
     ## TODO: separate into multiple jobs (after we figure out how to pass the subscription list)
-      - powershell: pipeline\get-subs.ps1
+      - powershell: $(Build.ArtifactStagingDirectory)/pipeline/get-subs.ps1
         displayName: "Get-Subscriptions"
         name: "get_subs"
         env:
