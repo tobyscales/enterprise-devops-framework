@@ -1,0 +1,135 @@
+resources:
+  repositories:
+  - repository: self
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - dev/*
+    exclude:
+      - prod
+
+variables:
+# Adjust these variables as necessary to change the behavior of the pipeline
+  - name: run_plan             # runs a terraform plan step first
+    value: false
+  - name: destroy_before_apply # runs a destroy before running the plan- use with caution!
+    value: false
+  - name: retry_apply
+    value: true
+
+## these variables are useful for troubleshooting pipeline/deployment errors
+  - name: run_apply            # will apply the files; you can disable to troubleshoot issues w the pipeline
+    value: true
+  - name: run_debug            # shows the output of all tokenized files; only use in emergency
+    value: true
+  - name: download_tfexe       # determines whether to download terraform.exe
+    value: true
+
+# you can set the default subscription here
+  - name: dirSubscriptionName0
+    value: "s12865_Microsoft_Internal_Account"
+
+# Don't adjust these unless you know what you're doing!
+  - name: subCount
+    value: 1
+  - name: EnvironmentName
+    value: "dev" 
+  - name: the_token
+    value: $(System.AccessToken)
+  - name: TF_VERSION
+    value: 0.11.11
+  - name: TG_VERSION
+    value: 0.18.1
+  - group: define-constants                       # place any global variables here
+  - group: s12865-Microsoft-Internal-Account      # create new variable groups for each subscription
+
+jobs:
+  - job: get_build_data
+    steps:
+    # This job sets foundSubs to true if it finds changes in the /live folder
+    ## TODO: separate into multiple jobs (after we figure out how to pass the subscription list)
+      - powershell: pipeline/get-subs.ps1
+        displayName: "Get-Subscriptions"
+        name: "get_subs"
+        env:
+          THE_TOKEN: $(System.AccessToken)
+
+  #- job: run_it
+  #  pool: Hosted
+  #  dependsOn: get_build_data
+  #  condition: and(succeeded(), eq(dependencies.get_build_data.outputs['do_skip.skipsubsequent'], 'true'))
+  #  steps:
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/config"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')))
+        inputs:
+          SourceFolder: config
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/config"
+
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/live"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')))
+        inputs:
+          SourceFolder: live
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/live"
+
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/scripts"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')))
+        inputs:
+          SourceFolder: scripts
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/scripts"
+
+      ## TODO: use a separate repo for modules
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/modules"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')))
+        inputs:
+          SourceFolder: modules
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/modules"
+
+      ## Download the executable
+      ## TODO: use containers instead
+      - powershell: pipeline\get-terraform.ps1
+        displayName: "Download TF"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')), eq(variables['download_tfexe'], 'true'))
+
+      ## Prep the CICD Files
+      - powershell: pipeline\get-cicdconfig.ps1
+        displayName: "Get-CICDConfig"
+        name: "get_cicdconfig"
+        env:
+          THE_TOKEN: $(System.AccessToken)
+      
+      ## Destroy, Plan, Apply
+      - powershell: pipeline\destroy-all.ps1
+        displayName: "Run Terraform destroy-all"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')), eq(variables['destroy_before_apply'], 'true'))
+
+      - powershell: pipeline\plan-all.ps1
+        displayName: "Run Terragrunt plan-all"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')), eq(variables['run_plan'], 'true'))
+
+      - powershell: pipeline\apply-all.ps1
+        displayName: "Run Terragrunt apply-all"
+        condition: and(succeeded(), or(eq(variables['foundSubs'], 'true'), eq(variables['run_debug'], 'true')), eq(variables['run_apply'], 'true'))
+        
+        ## Debugging Tasks
+      - powershell: pipeline\debug-files.ps1
+        displayName: "DEBUG: Output tokenized files and directory tree"
+        continueOnError: "true"
+        condition: eq(variables['run_debug'], 'true')
+
+      - powershell: pipeline\debug-plan.ps1
+        displayName: "DEBUG: Output terragrunt plan files"
+        continueOnError: "true"
+        condition: eq(variables['run_debug'], 'true')
+
+      - task: PublishBuildArtifacts@1
+        condition: eq(variables['run_debug'], 'true')
+        displayName: "Publish Artifact: build"
+        inputs:
+          ArtifactName: build
+          

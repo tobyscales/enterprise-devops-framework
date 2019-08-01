@@ -1,0 +1,159 @@
+resources:
+  - repo: self
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - prod
+
+variables:
+# Adjust these variables as necessary to change the behavior of the pipeline
+  - name: run-plan # runs a plan step first
+    value: true
+  - name: destroy-before-apply # runs a destroy before running the plan- use with caution!
+    value: false
+
+## these variables are useful for troubleshooting pipeline/deployment errors
+  - name: run-apply # will apply the files; you can disable to troubleshoot issues w the pipeline
+    value: true
+  - name: show-debug-output #shows the output of all tokenized files; only use in emergency
+    value: true
+  - name: download-files # determines whether to download terraform/terragrunt files
+    value: true
+
+# you can set the default subscription here
+  - name: subName0
+    value: "subsc_FoxCorp_DevOps_Services"
+
+# Don't adjust these unless you know what you're doing!
+  - name: subCount
+    value: 1
+  - name: EnvironmentName
+    value: "prod" 
+  - name: the_token
+    value: $(System.AccessToken)
+  - name: TF_VERSION
+    value: 0.11.10
+  - name: TG_VERSION
+    value: 0.17.2
+  - group: define-constants
+  - group: prod-foxcorp-devops-services
+  - group: prod-foxcorp-devops-services-spoke
+
+jobs:
+  - job: run_all
+    pool: Hosted
+    steps:
+      #  - job: create_plan
+      #    pool: Hosted
+      #    dependsOn: query_work_items
+      #    steps:
+      - task: PowerShell@2
+        displayName: "Get-WorkItems"
+        env:
+          THE_TOKEN: $(System.AccessToken)
+        inputs:
+          targetType: filePath
+          filePath: pipeline\get-workitems.ps1
+
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/config"
+        inputs:
+          SourceFolder: config
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/config"
+
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/live"
+        inputs:
+          SourceFolder: live
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/live"
+
+      - task: CopyFiles@2
+        displayName: "Copy Files to: $(Build.ArtifactStagingDirectory)/modules"
+        inputs:
+          SourceFolder: modules
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/modules"
+
+      # - job: download_prereqs
+      #   pool: Hosted
+      #   steps:
+      - task: PowerShell@2
+        displayName: "Download TF"
+        condition: eq(variables['download-files'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\get-terraform.ps1
+
+      - task: PowerShell@2
+        displayName: "Download TG"
+        condition: eq(variables['download-files'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\get-terragrunt.ps1
+
+      #  - job: tokenize_files
+      #    pool: Hosted
+      #    dependsOn: copy_files
+      #    steps:
+      - task: PowerShell@2
+        displayName: "Copy Terraform.tfvars and Global.tfvars, tokenize based on EnvironmentName"
+        inputs:
+          targetType: filePath
+          filePath: pipeline\prep-cicd.ps1
+
+      #  - job: run_plan
+      #    pool: Hosted
+      #    dependsOn: tokenize_files
+      #    steps:
+      - task: PowerShell@2
+        displayName: "Run Terragrunt plan-all"
+        condition: eq(variables['run-plan'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\plan-all.ps1
+
+      - task: PowerShell@2
+        displayName: "Run Terragrunt destroy-all"
+        condition: eq(variables['destroy-before-apply'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\destroy-all.ps1
+
+      - task: PowerShell@2
+        displayName: "Run Terragrunt apply-all"
+        condition: eq(variables['run-apply'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\apply-all.ps1
+
+      #  - job: output_debug
+      #    pool: Hosted
+      #    dependsOn: run_plan
+      #    steps:
+      - task: PowerShell@2
+        displayName: "DEBUG: Output tokenized files and directory tree"
+        continueOnError: true
+        condition: eq(variables['show-debug-output'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\debug-files.ps1
+
+      - task: PowerShell@2
+        displayName: "DEBUG: Output terragrunt plan files"
+        continueOnError: true
+        condition: eq(variables['show-debug-output'], 'true')
+        inputs:
+          targetType: filePath
+          filePath: pipeline\debug-plan.ps1
+
+      #- job: publish_artifacts
+      #  pool: Hosted
+      #  dependsOn: run_plan
+      #  steps:
+      - task: PublishBuildArtifacts@1
+
+        displayName: "Publish Artifact: build"
+
+        inputs:
+          ArtifactName: build
